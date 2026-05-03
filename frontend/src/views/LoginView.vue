@@ -7,6 +7,27 @@
       <el-tabs v-model="mode" stretch>
         <el-tab-pane label="登录" name="login">
           <el-form :model="loginForm" label-position="top" @keyup.enter="handleLogin">
+            <el-form-item label="预制账号">
+              <el-select
+                v-model="selectedPreset"
+                placeholder="选择演示账号"
+                filterable
+                style="width: 100%"
+                @change="applyPreset"
+              >
+                <el-option
+                  v-for="account in presetAccounts"
+                  :key="account.username"
+                  :label="`${account.label}：${account.username} / ${account.password}`"
+                  :value="account.username"
+                >
+                  <div class="preset-option">
+                    <span>{{ account.label }}</span>
+                    <code>{{ account.username }} / {{ account.password }}</code>
+                  </div>
+                </el-option>
+              </el-select>
+            </el-form-item>
             <el-form-item label="账号">
               <el-input v-model="loginForm.username" prefix-icon="User" />
             </el-form-item>
@@ -17,12 +38,6 @@
               登录系统
             </el-button>
           </el-form>
-          <el-divider />
-          <el-space wrap>
-            <el-button text @click="fill('admin')">管理员</el-button>
-            <el-button text @click="fill('doctor_chen')">医生</el-button>
-            <el-button text @click="fill('patient_li')">患者</el-button>
-          </el-space>
         </el-tab-pane>
 
         <el-tab-pane label="患者注册" name="register">
@@ -60,13 +75,25 @@ const router = useRouter()
 const auth = useAuthStore()
 const mode = ref('login')
 const loading = ref(false)
+const selectedPreset = ref('patient_li')
 
 const loginForm = reactive({ username: 'patient_li', password: '123456' })
 const registerForm = reactive({ username: '', password: '', name: '', phone: '' })
 
-function fill(username: string) {
-  loginForm.username = username
-  loginForm.password = '123456'
+const presetAccounts = [
+  { label: '管理员', username: 'admin', password: '123456' },
+  { label: '医生 陈洁', username: 'doctor_chen', password: '123456' },
+  { label: '医生 王启航', username: 'doctor_wang', password: '123456' },
+  { label: '患者 李明', username: 'patient_li', password: '123456' },
+  { label: '患者 张晓雨', username: 'patient_zhang', password: '123456' },
+  { label: '患者 刘浩', username: 'patient_liu', password: '123456' }
+]
+
+function applyPreset(username: string) {
+  const account = presetAccounts.find((item) => item.username === username)
+  if (!account) return
+  loginForm.username = account.username
+  loginForm.password = account.password
 }
 
 async function handleLogin() {
@@ -97,5 +124,17 @@ async function handleRegister() {
 <style scoped>
 .full {
   width: 100%;
+}
+
+.preset-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preset-option code {
+  color: #557178;
+  font-size: 12px;
 }
 </style>
