@@ -28,16 +28,26 @@ Authorization: Bearer <token>
 - `PUT /api/patient/profile`
 - `GET /api/patient/announcements`
 - `GET /api/patient/doctors`
+- `GET /api/patient/doctors/{id}`
 - `GET /api/patient/medicines`
+- `POST /api/patient/cart`
+- `GET /api/patient/cart`
+- `DELETE /api/patient/cart/{id}`
 - `POST /api/patient/orders`
 - `GET /api/patient/orders`
 - `PUT /api/patient/orders/{id}/refund`
+- `PUT /api/patient/orders/{id}/delivery`
 - `POST /api/patient/appointments`
 - `GET /api/patient/appointments`
 - `PUT /api/patient/appointments/{id}/cancel`
+- `PUT /api/patient/appointments/{id}/reschedule`
 - `GET /api/patient/records`
 - `POST /api/patient/ai/consult`
 - `GET /api/patient/reminders`
+- `GET /api/patient/reminders/alerts`
+- `POST /api/patient/messages`
+- `GET /api/patient/messages`
+- `POST /api/patient/reviews`
 
 ## 医生端
 
@@ -45,10 +55,14 @@ Authorization: Bearer <token>
 - `PUT /api/doctor/profile`
 - `GET /api/doctor/schedules`
 - `POST /api/doctor/schedules`
+- `PUT /api/doctor/schedules/{id}`
+- `DELETE /api/doctor/schedules/{id}`
 - `GET /api/doctor/appointments`
 - `PUT /api/doctor/appointments/{id}`
 - `POST /api/doctor/records`
+- `GET /api/doctor/patients/{patientId}/records`
 - `POST /api/doctor/prescriptions`
+- `GET /api/doctor/medicines`
 - `GET /api/doctor/messages`
 - `PUT /api/doctor/messages/{id}/reply`
 - `GET /api/doctor/stats`
@@ -61,12 +75,15 @@ Authorization: Bearer <token>
 - `PUT /api/admin/users/{id}/password`
 - `GET /api/admin/doctors`
 - `PUT /api/admin/doctors/{id}/review`
+- `GET /api/admin/qualifications`
 - `GET /api/admin/medicines`
 - `POST /api/admin/medicines`
 - `PUT /api/admin/medicines/{id}`
+- `DELETE /api/admin/medicines/{id}`
 - `GET /api/admin/announcements`
 - `POST /api/admin/announcements`
 - `PUT /api/admin/announcements/{id}`
+- `DELETE /api/admin/announcements/{id}`
 - `GET /api/admin/records`
 - `GET /api/admin/prescriptions`
 - `GET /api/admin/orders`
@@ -74,3 +91,7 @@ Authorization: Bearer <token>
 - `GET /api/admin/appointments`
 - `GET /api/admin/stats`
 - `GET /api/admin/logs`
+
+## 公共接口
+
+- `POST /api/files/upload`
