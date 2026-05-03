@@ -228,7 +228,7 @@ public class ClinicService {
         }
         DoctorProfile doctor = doctorByUser(principal.id);
         if (requireApproved && doctor.reviewStatus != ReviewStatus.APPROVED) {
-            throw new BusinessException("doctor qualification is not approved");
+            throw new BusinessException("医生资质尚未审核通过");
         }
         return doctor;
     }
@@ -289,7 +289,7 @@ public class ClinicService {
         DoctorProfile doctor = currentDoctor(true);
         DoctorSchedule existing = schedules.selectById(id);
         if (existing == null || !Objects.equals(existing.doctorId, doctor.id)) {
-            throw new BusinessException("schedule not found");
+            throw new BusinessException("排班记录不存在或无权操作");
         }
         validateScheduleEditable(existing.workDate, existing.bookedCount);
         validateScheduleEditable(request.workDate, existing.bookedCount);
@@ -306,7 +306,7 @@ public class ClinicService {
         DoctorProfile doctor = currentDoctor(true);
         DoctorSchedule existing = schedules.selectById(id);
         if (existing == null || !Objects.equals(existing.doctorId, doctor.id)) {
-            throw new BusinessException("schedule not found");
+            throw new BusinessException("排班记录不存在或无权操作");
         }
         validateScheduleEditable(existing.workDate, existing.bookedCount);
         schedules.deleteById(id);
@@ -315,10 +315,10 @@ public class ClinicService {
 
     private void validateScheduleEditable(LocalDate workDate, Integer bookedCount) {
         if (workDate == null || workDate.isBefore(LocalDate.now())) {
-            throw new BusinessException("only future schedules can be changed");
+            throw new BusinessException("只能修改未来日期的排班");
         }
         if (bookedCount != null && bookedCount > 0) {
-            throw new BusinessException("schedule already has appointments and cannot be changed");
+            throw new BusinessException("该排班已有预约，不能修改或删除");
         }
     }
 

@@ -1,27 +1,52 @@
 <template>
-  <div class="shell theme-doctor">
-    <aside class="sidebar">
-      <div class="brand">Dental Clinic</div>
-      <div class="role-pill"><el-icon><FirstAidKit /></el-icon> 医生端</div>
-      <el-menu :default-active="activeTab" background-color="#113c49" text-color="#d9eff2" active-text-color="#ffffff" @select="activeTab = $event">
-        <el-menu-item v-for="item in tabs" :key="item.name" :index="item.name">
+  <div class="doctor-layout theme-doctor">
+    <aside class="doctor-sidebar">
+      <div class="sidebar-header">
+        <el-icon class="brand-icon"><FirstAidKit /></el-icon>
+        <span class="brand-text">SmileCare</span>
+        <el-tag size="small" effect="dark" round color="rgba(255,255,255,0.2)" class="role-tag">医生端</el-tag>
+      </div>
+      
+      <div class="sidebar-menu">
+        <div 
+          v-for="item in tabs" 
+          :key="item.name"
+          class="menu-item"
+          :class="{ active: activeTab === item.name }"
+          @click="activeTab = item.name"
+        >
           <el-icon><component :is="item.icon" /></el-icon>
           <span>{{ item.label }}</span>
-        </el-menu-item>
-      </el-menu>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="doc-info">
+          <el-avatar size="small" icon="UserFilled" class="doc-avatar" />
+          <div class="doc-text">
+            <div class="doc-name">{{ profile?.name || '医生' }}</div>
+            <div class="doc-title">{{ profile?.department || '未分配科室' }}</div>
+          </div>
+        </div>
+        <el-button link class="logout-btn" @click="logout"><el-icon><SwitchButton /></el-icon></el-button>
+      </div>
     </aside>
 
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <div class="page-title">医生工作台</div>
-          <div class="muted">{{ profile?.name }} · {{ reviewStatusLabel(profile?.reviewStatus) }}</div>
+    <main class="doctor-main">
+      <header class="doctor-header">
+        <div class="header-left">
+          <h2 class="current-title">{{ currentTabLabel }}</h2>
         </div>
-        <el-button icon="SwitchButton" @click="logout">退出</el-button>
+        <div class="header-right">
+          <el-tag :type="profile?.reviewStatus === 'APPROVED' ? 'success' : 'warning'" round effect="light">
+            状态: {{ reviewStatusLabel(profile?.reviewStatus) }}
+          </el-tag>
+        </div>
       </header>
 
-      <section class="panel">
-        <el-tabs v-model="activeTab">
+      <div class="doctor-content">
+        <div class="content-wrapper">
+          <el-tabs v-model="activeTab" class="hidden-header-tabs">
           <el-tab-pane label="个人信息" name="profile">
             <el-alert v-if="profile?.reviewStatus !== 'APPROVED'" type="warning" :closable="false" title="医生账号审核通过后，才可以维护排班、处理预约和接诊。" />
             <el-form :model="profileForm" label-width="90px" class="narrow-form mt">
@@ -62,7 +87,7 @@
           <el-tab-pane label="预约审核" name="appointments">
             <el-alert type="info" :closable="false" title="此处只处理患者提交的新预约。确认、拒绝、改期都会写入预约状态，并生成患者端预约通知。" />
             <div class="toolbar mt">
-              <el-date-picker v-model="filterDate" value-format="YYYY-MM-DD" placeholder="按日期筛选" />
+              <el-date-picker v-model="reviewDate" value-format="YYYY-MM-DD" placeholder="按日期筛选" clearable />
               <el-button icon="Refresh" @click="loadAppointments">刷新</el-button>
             </div>
             <el-table :data="reviewAppointments" stripe>
@@ -87,11 +112,13 @@
           </el-tab-pane>
 
           <el-tab-pane label="待接诊" name="reception">
+            <el-alert type="info" :closable="false" title="默认显示当前医生全部待接诊记录，并按日期、时间顺序排序；可按日期筛选。" />
             <div class="toolbar">
-              <el-date-picker v-model="receptionDate" value-format="YYYY-MM-DD" />
+              <el-date-picker v-model="receptionDate" value-format="YYYY-MM-DD" placeholder="按日期筛选" clearable />
               <el-button icon="Refresh" @click="loadAppointments">刷新接诊队列</el-button>
             </div>
             <el-table :data="receptionAppointments" stripe>
+              <el-table-column label="日期" prop="appointment.visitDate" width="130" />
               <el-table-column label="顺序" type="index" width="70" />
               <el-table-column label="患者" prop="patient.name" width="120" />
               <el-table-column label="时间" prop="appointment.timeSlot" width="110" />
@@ -261,7 +288,8 @@
             </el-table>
           </el-tab-pane>
         </el-tabs>
-      </section>
+        </div>
+      </div>
     </main>
   </div>
 </template>
@@ -276,7 +304,6 @@ import { useAuthStore } from '../store'
 const router = useRouter()
 const auth = useAuthStore()
 const activeTab = ref('profile')
-const today = new Date().toISOString().slice(0, 10)
 const tabs = [
   { name: 'profile', label: '个人信息', icon: 'User' },
   { name: 'schedules', label: '出诊排班', icon: 'Calendar' },
@@ -288,6 +315,8 @@ const tabs = [
   { name: 'stats', label: '留言统计', icon: 'DataAnalysis' }
 ]
 
+const currentTabLabel = computed(() => tabs.find(t => t.name === activeTab.value)?.label || '')
+
 const profile = ref<any>(null)
 const profileForm = reactive<any>({})
 const schedules = ref<any[]>([])
@@ -295,8 +324,8 @@ const appointments = ref<any[]>([])
 const messages = ref<any[]>([])
 const medicines = ref<any[]>([])
 const stats = ref<any>({})
-const filterDate = ref('')
-const receptionDate = ref(today)
+const reviewDate = ref('')
+const receptionDate = ref('')
 const selectedEncounter = ref<any>(null)
 const patientHistory = ref<any[]>([])
 const historyRecords = ref<any[]>([])
@@ -324,11 +353,22 @@ const reviewStatusMap: Record<string, string> = {
   REJECTED: '已拒绝'
 }
 
-const reviewAppointments = computed(() => appointments.value.filter((row) => row.appointment.status === 'SUBMITTED'))
+const sortedAppointments = computed(() =>
+  [...appointments.value].sort((left, right) => {
+    const leftKey = `${left.appointment.visitDate || ''} ${left.appointment.timeSlot || ''}`
+    const rightKey = `${right.appointment.visitDate || ''} ${right.appointment.timeSlot || ''}`
+    return leftKey.localeCompare(rightKey)
+  })
+)
+const reviewAppointments = computed(() =>
+  sortedAppointments.value.filter((row) =>
+    row.appointment.status === 'SUBMITTED' && matchesDateFilter(row.appointment.visitDate, reviewDate.value)
+  )
+)
 const receptionAppointments = computed(() =>
-  appointments.value.filter((row) =>
+  sortedAppointments.value.filter((row) =>
     ['CONFIRMED', 'RESCHEDULED'].includes(row.appointment.status) &&
-    row.appointment.visitDate === receptionDate.value
+    matchesDateFilter(row.appointment.visitDate, receptionDate.value)
   )
 )
 const knownPatients = computed(() => {
@@ -362,6 +402,11 @@ function appointmentStatusTag(status: string) {
   if (['REJECTED', 'CANCELLED', 'NO_SHOW'].includes(status)) return 'danger'
   if (status === 'COMPLETED') return 'info'
   return 'warning'
+}
+
+function matchesDateFilter(visitDate?: string, filterDate?: string) {
+  if (!filterDate) return true
+  return visitDate === filterDate
 }
 
 async function loadAll() {
@@ -402,7 +447,7 @@ async function deleteSchedule(id: number) {
 }
 
 async function loadAppointments() {
-  appointments.value = await apiGet('/doctor/appointments', filterDate.value ? { date: filterDate.value } : undefined)
+  appointments.value = await apiGet('/doctor/appointments')
 }
 
 async function confirmAppointment(row: any) {
@@ -514,6 +559,154 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
+.doctor-layout {
+  display: flex;
+  height: 100vh;
+  background: var(--bg-body);
+  overflow: hidden;
+}
+
+.doctor-sidebar {
+  width: 260px;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.06);
+  z-index: 10;
+}
+
+.sidebar-header {
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand-icon {
+  font-size: 24px;
+  color: #fff;
+}
+.brand-text {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  flex: 1;
+}
+.role-tag {
+  border: none;
+}
+
+.sidebar-menu {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--sidebar-text);
+  font-size: 15px;
+  transition: all 0.2s ease;
+  margin-bottom: 4px;
+}
+.menu-item:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+.menu-item.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-text);
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.menu-item .el-icon {
+  font-size: 18px;
+}
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.doc-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.doc-avatar {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+.doc-text {
+  display: flex;
+  flex-direction: column;
+}
+.doc-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+.doc-title {
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+}
+.logout-btn {
+  color: rgba(255,255,255,0.6);
+}
+.logout-btn:hover {
+  color: #fff;
+}
+
+.doctor-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+}
+
+.doctor-header {
+  height: 64px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.02);
+  z-index: 5;
+}
+.current-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--topbar-title);
+}
+
+.doctor-content {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+.content-wrapper {
+  background: var(--panel-bg);
+  border-radius: 16px;
+  padding: 24px 32px;
+  box-shadow: var(--panel-shadow);
+  border: 1px solid var(--panel-border);
+  min-height: calc(100vh - 128px);
+}
+
+:deep(.hidden-header-tabs > .el-tabs__header) {
+  display: none !important;
+}
+
 .narrow-form {
   max-width: 680px;
 }
