@@ -8,17 +8,10 @@
 - 后端：Spring Boot 3、Java 17、Spring Security JWT、MyBatis-Plus、MySQL 8
 - AI：OpenAI 兼容外部接口，配置保存在本地 MySQL 的 `ai_config` 表
 
-## 默认账号
 
-| 角色 | 账号 | 密码 |
-| --- | --- | --- |
-| 管理员 | `admin` | `123456` |
-| 医生 | `doctor_chen` | `123456` |
-| 患者 | `patient_li` | `123456` |
+## 新环境启动
 
-## 新电脑启动
-
-推荐直接使用新脚本目录下的启动脚本：
+直接使用脚本目录下的启动脚本：
 
 ```powershell
 .\scripts\bootstrap-dev\bootstrap-dev.cmd
@@ -42,13 +35,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-dev\bootstrap-dev.p
   -DbName dental_clinic
 ```
 
-## 当前机器快速启动
-
-如果数据库已经存在、依赖也已经安装好，可以继续使用根目录的快速启动脚本：
-
-```powershell
-.\start-dev.cmd
-```
 
 ## 数据库与初始化
 
@@ -58,21 +44,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-dev\bootstrap-dev.p
   - `backend/src/main/resources/data.sql`
 - 新脚本也会在启动前主动建库并导入，适合空 MySQL 环境
 
-## AI 配置
-
-AI 牙医使用 OpenAI 兼容接口。真实 `base_url`、`api_key`、`model` 需要写入本地数据库 `ai_config`，不要提交到仓库：
-
-```sql
-UPDATE ai_config
-SET base_url = 'https://api.openai.com/v1',
-    api_key = 'your_api_key',
-    model = 'gpt-4o-mini',
-    enabled = 1,
-    updated_at = NOW()
-WHERE id = 1;
-```
-
-`application.yml` 只保留超时等非敏感运行参数。
 
 ## 说明
 
