@@ -1,0 +1,147 @@
+:root {
+  font-family: Inter, "Microsoft YaHei", Arial, sans-serif;
+  color: #263238;
+  background: #f4f7f8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+}
+
+.sidebar {
+  background: #113c49;
+  color: #f5fbfc;
+  padding: 24px 18px;
+}
+
+.brand {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 28px;
+}
+
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #17424e;
+  background: #d8f3ef;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  margin-bottom: 18px;
+}
+
+.main {
+  min-width: 0;
+  padding: 22px;
+}
+
+.topbar {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e3eaec;
+  border-radius: 8px;
+  padding: 18px;
+  box-shadow: 0 8px 26px rgba(17, 60, 73, 0.06);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric {
+  border: 1px solid #e1eaec;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfdfd;
+}
+
+.metric strong {
+  display: block;
+  font-size: 24px;
+  color: #0b6e69;
+}
+
+.muted {
+  color: #6a7a80;
+}
+
+.danger-text {
+  color: #b54708;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(120deg, rgba(9, 94, 102, 0.92), rgba(35, 97, 64, 0.78)),
+    url("https://images.unsplash.com/photo-1606811971618-4486d14f3f99?auto=format&fit=crop&w=1600&q=80") center/cover;
+}
+
+.login-panel {
+  width: min(440px, 100%);
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 28px;
+  box-shadow: 0 18px 60px rgba(10, 32, 38, 0.24);
+}
+
+.login-title {
+  margin: 0 0 8px;
+  font-size: 26px;
+}
+
+.login-subtitle {
+  margin: 0 0 22px;
+  color: #66777d;
+}
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    min-height: auto;
+  }
+
+  .main {
+    padding: 14px;
+  }
+}

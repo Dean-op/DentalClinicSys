@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+set -e
+MVNW_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+MAVEN_VERSION=3.9.9
+MAVEN_HOME="$MVNW_DIR/.mvn/wrapper/apache-maven-$MAVEN_VERSION"
+MAVEN_BIN="$MAVEN_HOME/bin/mvn"
+
+if [ ! -x "$MAVEN_BIN" ]; then
+  mkdir -p "$MVNW_DIR/.mvn/wrapper"
+  ZIP="$MVNW_DIR/.mvn/wrapper/apache-maven-$MAVEN_VERSION-bin.zip"
+  URL="https://archive.apache.org/dist/maven/maven-3/$MAVEN_VERSION/binaries/apache-maven-$MAVEN_VERSION-bin.zip"
+  if [ ! -f "$ZIP" ]; then
+    if command -v curl >/dev/null 2>&1; then
+      curl -L "$URL" -o "$ZIP"
+    else
+      wget "$URL" -O "$ZIP"
+    fi
+  fi
+  unzip -o "$ZIP" -d "$MVNW_DIR/.mvn/wrapper"
+fi
+
+exec "$MAVEN_BIN" "$@"
