@@ -6,7 +6,7 @@
 
 - Frontend: Vue 3, Vite, TypeScript, Pinia, Vue Router, Element Plus, Axios
 - Backend: Spring Boot 3, Java 17, Spring Security JWT, MyBatis-Plus, MySQL 8
-- AI: rule-based symptom matching with a replaceable AI service boundary
+- AI: OpenAI-compatible external API, configured from the local MySQL `ai_config` table
 
 ## Default Accounts
 
@@ -33,6 +33,20 @@
    .\mvnw.cmd spring-boot:run
    ```
 
+   AI dentist uses an OpenAI-compatible external API. Store the real API info in local MySQL, not in source files:
+
+   ```sql
+   UPDATE ai_config
+   SET base_url = 'https://api.openai.com/v1',
+       api_key = 'your_api_key',
+       model = 'gpt-4o-mini',
+       enabled = 1,
+       updated_at = NOW()
+   WHERE id = 1;
+   ```
+
+   `application.yml` only keeps non-secret runtime settings such as timeout.
+
 4. Start frontend:
 
    ```powershell
@@ -46,4 +60,4 @@ Open the frontend URL printed by Vite. API requests are proxied to `http://local
 ## Notes
 
 - The first version is intended for graduation-project demonstration and does not integrate real payment, SMS, logistics, insurance, or medical compliance systems.
-- AI consultation output is only preliminary reference and cannot replace a doctor's diagnosis.
+- AI consultation calls an external OpenAI-compatible `/chat/completions` API. Its output is only preliminary reference and cannot replace a doctor's diagnosis.

@@ -25,3 +25,7 @@ mybatis-plus:
 app:
   jwt-secret: "dental-clinic-demo-secret-change-before-production"
   upload-dir: uploads
+  ai:
+    # Real base_url/api_key/model are stored in local MySQL table ai_config.
+    # Do not commit real API keys to source control.
+    timeout-seconds: 45

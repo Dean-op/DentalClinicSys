@@ -125,7 +125,10 @@
                 <el-input v-model="symptomInput" type="textarea" :rows="5" placeholder="请输入牙痛、牙龈出血、口臭等症状" />
                 <el-button type="primary" icon="MagicStick" style="margin-top: 10px" @click="consult">AI牙医初评</el-button>
                 <el-alert v-if="consultResult" class="mt" type="warning" :closable="false" :title="consultResult.disclaimer" />
-                <pre v-if="consultResult" class="result">{{ consultResult }}</pre>
+                <div v-if="consultResult" class="result">
+                  <div class="muted">模型：{{ consultResult.model }} · {{ consultResult.provider }}</div>
+                  <pre>{{ consultResult.answer }}</pre>
+                </div>
               </el-col>
               <el-col :md="12" :xs="24">
                 <el-divider content-position="left">既往病例</el-divider>
@@ -244,12 +247,18 @@ onMounted(loadAll)
   margin-top: 12px;
 }
 .result {
-  white-space: pre-wrap;
   background: #f7faf9;
   border: 1px solid #dbe8e5;
   border-radius: 8px;
   padding: 12px;
   max-height: 320px;
   overflow: auto;
+}
+
+.result pre {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  line-height: 1.7;
 }
 </style>

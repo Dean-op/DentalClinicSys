@@ -37,9 +37,11 @@ public class ClinicService {
     private final MessageMapper messages;
     private final DoctorReviewMapper reviews;
     private final SymptomRuleMapper symptomRules;
+    private final AiConfigMapper aiConfigs;
     private final MedicationReminderMapper reminders;
     private final OperationLogMapper logs;
     private final PasswordEncoder passwordEncoder;
+    private final AiConsultationService aiConsultationService;
 
     public ClinicService(UserAccountMapper users, PatientProfileMapper patients, DoctorProfileMapper doctors,
                          DoctorQualificationMapper qualifications, DoctorScheduleMapper schedules,
@@ -47,9 +49,9 @@ public class ClinicService {
                          MedicineOrderMapper orders, OrderItemMapper orderItems, AppointmentMapper appointments,
                          MedicalRecordMapper records, PrescriptionMapper prescriptions,
                          PrescriptionItemMapper prescriptionItems, MessageMapper messages,
-                         DoctorReviewMapper reviews, SymptomRuleMapper symptomRules,
+                         DoctorReviewMapper reviews, SymptomRuleMapper symptomRules, AiConfigMapper aiConfigs,
                          MedicationReminderMapper reminders, OperationLogMapper logs,
-                         PasswordEncoder passwordEncoder) {
+                         PasswordEncoder passwordEncoder, AiConsultationService aiConsultationService) {
         this.users = users;
         this.patients = patients;
         this.doctors = doctors;
@@ -67,9 +69,11 @@ public class ClinicService {
         this.messages = messages;
         this.reviews = reviews;
         this.symptomRules = symptomRules;
+        this.aiConfigs = aiConfigs;
         this.reminders = reminders;
         this.logs = logs;
         this.passwordEncoder = passwordEncoder;
+        this.aiConsultationService = aiConsultationService;
     }
 
     public UserAccountMapper users() {
@@ -126,6 +130,10 @@ public class ClinicService {
 
     public OperationLogMapper logs() {
         return logs;
+    }
+
+    public AiConfigMapper aiConfigs() {
+        return aiConfigs;
     }
 
     @Transactional
@@ -423,13 +431,13 @@ public class ClinicService {
         List<Medicine> recommendedMedicines = medicineIds.isEmpty()
             ? List.of()
             : medicines.selectBatchIds(medicineIds);
-        return Map.of(
-            "disclaimer", "AI建议仅为初步参考，不能替代医生诊断。如疼痛明显、出血、发热或肿胀加重，请及时就医。",
-            "rules", matched,
-            "recommendedDepartments", departments,
-            "recommendedDoctors", recommendedDoctors,
-            "recommendedMedicines", recommendedMedicines
-        );
+        Map<String, Object> aiResult = aiConsultationService.consult(symptoms, matched, recommendedDoctors, recommendedMedicines);
+        Map<String, Object> result = new LinkedHashMap<>(aiResult);
+        result.put("rules", matched);
+        result.put("recommendedDepartments", departments);
+        result.put("recommendedDoctors", recommendedDoctors);
+        result.put("recommendedMedicines", recommendedMedicines);
+        return result;
     }
 
     public List<MedicationReminder> myReminders() {

@@ -172,6 +172,19 @@ CREATE TABLE IF NOT EXISTS symptom_rule (
   advice TEXT NOT NULL
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='症状匹配规则表，存储AI牙医和症状推荐使用的关键词、原因、科室和建议';
 
+CREATE TABLE IF NOT EXISTS ai_config (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  provider_name VARCHAR(64) NOT NULL,
+  base_url VARCHAR(255) NOT NULL,
+  api_key VARCHAR(500) NOT NULL,
+  model VARCHAR(120) NOT NULL,
+  temperature DOUBLE NOT NULL DEFAULT 0.2,
+  max_tokens INT NOT NULL DEFAULT 900,
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  remark VARCHAR(500) NULL,
+  updated_at DATETIME NOT NULL
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI接口配置表，存储OpenAI兼容接口地址、密钥、模型和启用状态';
+
 CREATE TABLE IF NOT EXISTS medication_reminder (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   patient_id BIGINT NOT NULL,
@@ -210,5 +223,6 @@ ALTER TABLE prescription_item CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_u
 ALTER TABLE message CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE doctor_review CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE symptom_rule CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE ai_config CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE medication_reminder CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE operation_log CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
