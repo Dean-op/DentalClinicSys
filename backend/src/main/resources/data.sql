@@ -5,7 +5,9 @@ INSERT INTO user_account (id, username, password_hash, role, status, created_at)
 (4, 'doctor_wang', '{noop}123456', 'DOCTOR', 'ENABLED', NOW()),
 (5, 'doctor_zhao', '{noop}123456', 'DOCTOR', 'ENABLED', NOW()),
 (6, 'patient_zhang', '{noop}123456', 'PATIENT', 'ENABLED', NOW()),
-(7, 'patient_liu', '{noop}123456', 'PATIENT', 'ENABLED', NOW()) ON DUPLICATE KEY UPDATE
+(7, 'patient_liu', '{noop}123456', 'PATIENT', 'ENABLED', NOW()),
+(8, 'doctor_sun', '{noop}123456', 'DOCTOR', 'ENABLED', NOW()),
+(9, 'doctor_lin', '{noop}123456', 'DOCTOR', 'ENABLED', NOW()) ON DUPLICATE KEY UPDATE
   username = VALUES(username),
   password_hash = VALUES(password_hash),
   role = VALUES(role),
@@ -26,7 +28,9 @@ INSERT INTO patient_profile (id, user_id, name, gender, phone, address, allergy_
 INSERT INTO doctor_profile (id, user_id, name, title, department, specialty, introduction, review_status, rating) VALUES
 (1, 2, '陈洁', '主治医师', '口腔综合科', '龋齿修复、牙髓炎、牙周基础治疗', '从事口腔临床工作 8 年，擅长常见口腔疾病诊疗与患者健康宣教。', 'APPROVED', 4.8),
 (2, 4, '王启航', '副主任医师', '牙周科', '牙龈炎、牙周炎、洁治与牙周维护', '长期负责牙周基础治疗与复诊维护，重视患者刷牙和牙线习惯管理。', 'APPROVED', 4.7),
-(3, 5, '赵宁', '医师', '儿童口腔科', '儿童龋齿、窝沟封闭、涂氟', '关注儿童就诊体验，擅长儿童口腔预防和早期龋齿处理。', 'PENDING', 5.0) ON DUPLICATE KEY UPDATE
+(3, 5, '赵宁', '医师', '儿童口腔科', '儿童龋齿、窝沟封闭、涂氟', '关注儿童就诊体验，擅长儿童口腔预防和早期龋齿处理。', 'PENDING', 5.0),
+(4, 8, '孙雅', '主治医师', '正畸科', '青少年早期矫治、隐形矫正咨询、牙列不齐评估', '擅长正畸初筛和矫治方案沟通，重视美观与咬合功能平衡。', 'APPROVED', 4.9),
+(5, 9, '林周', '副主任医师', '修复种植科', '牙体缺损修复、嵌体修复、种植修复评估', '长期从事口腔修复与种植修复评估，擅长复杂缺牙修复设计。', 'APPROVED', 4.6) ON DUPLICATE KEY UPDATE
   user_id = VALUES(user_id),
   name = VALUES(name),
   title = VALUES(title),
@@ -39,7 +43,9 @@ INSERT INTO doctor_profile (id, user_id, name, title, department, specialty, int
 INSERT INTO doctor_qualification (id, doctor_id, certificate_type, file_path, status, review_comment, submitted_at, reviewed_at) VALUES
 (1, 1, '执业医师资格证', '/uploads/demo-certificate.jpg', 'APPROVED', '资质完整，允许开展在线诊疗。', NOW(), NOW()),
 (2, 2, '副主任医师职称证明', '/uploads/demo-periodontal-certificate.jpg', 'APPROVED', '资质完整，允许开展在线诊疗。', NOW(), NOW()),
-(3, 3, '执业医师资格证', '/uploads/demo-child-certificate.jpg', 'PENDING', '待管理员审核。', NOW(), NULL) ON DUPLICATE KEY UPDATE
+(3, 3, '执业医师资格证', '/uploads/demo-child-certificate.jpg', 'PENDING', '待管理员审核。', NOW(), NULL),
+(4, 4, '主治医师职称证明', '/uploads/demo-orthodontics-certificate.jpg', 'APPROVED', '资质完整，允许开展在线诊疗。', NOW(), NOW()),
+(5, 5, '副主任医师职称证明', '/uploads/demo-implant-certificate.jpg', 'APPROVED', '资质完整，允许开展在线诊疗。', NOW(), NOW()) ON DUPLICATE KEY UPDATE
   doctor_id = VALUES(doctor_id),
   certificate_type = VALUES(certificate_type),
   file_path = VALUES(file_path),
@@ -53,7 +59,11 @@ INSERT INTO doctor_schedule (id, doctor_id, work_date, start_time, end_time, cap
 (2, 1, DATE_ADD(CURDATE(), INTERVAL 2 DAY), '14:00:00', '18:00:00', 8, 0),
 (3, 2, DATE_ADD(CURDATE(), INTERVAL 1 DAY), '14:00:00', '18:00:00', 6, 1),
 (4, 2, DATE_ADD(CURDATE(), INTERVAL 3 DAY), '09:00:00', '12:00:00', 6, 0),
-(5, 3, DATE_ADD(CURDATE(), INTERVAL 4 DAY), '09:00:00', '12:00:00', 4, 0) ON DUPLICATE KEY UPDATE
+(5, 3, DATE_ADD(CURDATE(), INTERVAL 4 DAY), '09:00:00', '12:00:00', 4, 0),
+(6, 4, DATE_ADD(CURDATE(), INTERVAL 2 DAY), '09:00:00', '12:00:00', 5, 0),
+(7, 4, DATE_ADD(CURDATE(), INTERVAL 5 DAY), '14:00:00', '18:00:00', 5, 0),
+(8, 5, DATE_ADD(CURDATE(), INTERVAL 2 DAY), '14:00:00', '18:00:00', 6, 0),
+(9, 5, DATE_ADD(CURDATE(), INTERVAL 6 DAY), '09:00:00', '12:00:00', 6, 0) ON DUPLICATE KEY UPDATE
   doctor_id = VALUES(doctor_id),
   work_date = VALUES(work_date),
   start_time = VALUES(start_time),
@@ -80,7 +90,11 @@ INSERT INTO medicine (id, name, effect, usage_instruction, price, stock, on_shel
 (3, '脱敏牙膏', '改善牙本质敏感', '每日刷牙使用，坚持 2-4 周观察效果。', 39.90, 60, 1),
 (4, '医用牙线棒', '辅助清洁牙缝', '饭后使用，避免用力损伤牙龈。', 16.80, 200, 1),
 (5, '儿童含氟牙膏', '儿童龋齿预防辅助', '黄豆大小用量，儿童需在家长指导下使用。', 32.00, 90, 1),
-(6, '口腔溃疡凝胶', '缓解口腔黏膜不适', '局部薄涂，每日 2-3 次，连续不适应就诊。', 24.50, 75, 1) ON DUPLICATE KEY UPDATE
+(6, '口腔溃疡凝胶', '缓解口腔黏膜不适', '局部薄涂，每日 2-3 次，连续不适应就诊。', 24.50, 75, 1),
+(7, '正畸保护蜡', '缓解托槽或弓丝摩擦造成的不适', '取少量覆盖摩擦位置，进食前取下。', 19.90, 100, 1),
+(8, '儿童软毛牙刷', '儿童日常口腔清洁', '建议 3 个月更换一次，家长协助刷牙。', 22.00, 110, 1),
+(9, '含氟漱口水', '辅助预防龋齿和维护口腔清洁', '每日 1 次，儿童需在家长指导下使用。', 35.00, 70, 1),
+(10, '种植牙护理刷', '种植修复后辅助清洁', '按医生指导清洁种植体周围区域。', 48.00, 45, 1) ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   effect = VALUES(effect),
   usage_instruction = VALUES(usage_instruction),
@@ -93,7 +107,9 @@ INSERT INTO symptom_rule (id, keywords, possible_cause, recommended_department, 
 (2, '牙龈出血,出血,牙龈肿', '牙龈炎、牙结石或刷牙方式不当', '牙周科', '1', '使用软毛牙刷，避免用力横刷，建议进行牙周检查和洁治评估。'),
 (3, '口臭,异味', '口腔卫生不佳、牙周炎或龋齿', '口腔综合科', '1', '加强舌苔和牙缝清洁，如长期口臭建议就诊排查。'),
 (4, '儿童,蛀牙,黑点,乳牙', '儿童龋齿或窝沟清洁不足', '儿童口腔科', '5', '建议家长帮助儿童刷牙，减少高频甜食摄入，并预约儿童口腔检查。'),
-(5, '溃疡,口腔破,黏膜疼', '复发性口腔溃疡、局部刺激或咬伤', '口腔综合科', '6', '避免辛辣刺激，观察 7-10 天；若反复发作或面积较大请就医。') ON DUPLICATE KEY UPDATE
+(5, '溃疡,口腔破,黏膜疼', '复发性口腔溃疡、局部刺激或咬伤', '口腔综合科', '6', '避免辛辣刺激，观察 7-10 天；若反复发作或面积较大请就医。'),
+(6, '牙齿不齐,龅牙,地包天,矫正,正畸', '牙列不齐、咬合异常或青少年早期错颌问题', '正畸科', '7,9', '建议预约正畸初筛，携带既往影像资料；托槽摩擦不适可临时使用正畸保护蜡。'),
+(7, '缺牙,种植,牙冠,嵌体,修复', '牙体缺损、缺牙修复需求或种植修复维护问题', '修复种植科', '10,9', '建议先进行口腔检查和影像评估，修复后应按医生指导清洁种植体和牙冠周围。') ON DUPLICATE KEY UPDATE
   keywords = VALUES(keywords),
   possible_cause = VALUES(possible_cause),
   recommended_department = VALUES(recommended_department),

@@ -49,8 +49,14 @@
             </div>
             <el-table :data="users" stripe>
               <el-table-column prop="username" label="账号" />
-              <el-table-column prop="role" label="角色" />
-              <el-table-column prop="status" label="状态" />
+              <el-table-column label="角色">
+                <template #default="{ row }">{{ roleLabel(row.role) }}</template>
+              </el-table-column>
+              <el-table-column label="状态">
+                <template #default="{ row }">
+                  <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'">{{ accountStatusLabel(row.status) }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="操作" width="180">
                 <template #default="{ row }">
                   <el-button type="warning" link @click="resetPassword(row.id)">重置密码</el-button>
@@ -65,7 +71,11 @@
               <el-table-column prop="name" label="医生" />
               <el-table-column prop="title" label="职称" />
               <el-table-column prop="department" label="科室" />
-              <el-table-column prop="reviewStatus" label="审核状态" />
+              <el-table-column label="审核状态">
+                <template #default="{ row }">
+                  <el-tag :type="reviewStatusTag(row.reviewStatus)">{{ reviewStatusLabel(row.reviewStatus) }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="操作" width="180">
                 <template #default="{ row }">
                   <el-button type="success" link @click="reviewDoctor(row.id, 'APPROVED')">通过</el-button>
@@ -88,7 +98,11 @@
               <el-table-column prop="effect" label="功效" />
               <el-table-column prop="price" label="价格" />
               <el-table-column prop="stock" label="库存" />
-              <el-table-column prop="onShelf" label="上架" />
+              <el-table-column label="上架">
+                <template #default="{ row }">
+                  <el-tag :type="row.onShelf ? 'success' : 'info'">{{ row.onShelf ? '已上架' : '已下架' }}</el-tag>
+                </template>
+              </el-table-column>
             </el-table>
           </el-tab-pane>
 
@@ -109,7 +123,11 @@
             <el-table :data="announcements" stripe @row-click="editAnnouncement">
               <el-table-column prop="title" label="标题" />
               <el-table-column prop="category" label="分类" />
-              <el-table-column prop="status" label="状态" />
+              <el-table-column label="状态">
+                <template #default="{ row }">
+                  <el-tag :type="announcementStatusTag(row.status)">{{ announcementStatusLabel(row.status) }}</el-tag>
+                </template>
+              </el-table-column>
             </el-table>
           </el-tab-pane>
 
@@ -118,7 +136,11 @@
             <el-table :data="orders" stripe>
               <el-table-column prop="order.orderNo" label="订单号" />
               <el-table-column prop="order.totalAmount" label="金额" />
-              <el-table-column prop="order.status" label="状态" />
+              <el-table-column label="状态">
+                <template #default="{ row }">
+                  <el-tag :type="orderStatusTag(row.order.status)">{{ orderStatusLabel(row.order.status) }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="操作" width="180">
                 <template #default="{ row }">
                   <el-button type="success" link @click="updateOrder(row.order.id, 'REFUNDED')">退款通过</el-button>
@@ -134,7 +156,9 @@
             </el-table>
             <el-divider content-position="left">系统日志</el-divider>
             <el-table :data="logs" stripe>
-              <el-table-column prop="operatorRole" label="角色" />
+              <el-table-column label="角色">
+                <template #default="{ row }">{{ roleLabel(row.operatorRole) }}</template>
+              </el-table-column>
               <el-table-column prop="action" label="操作" />
               <el-table-column prop="detail" label="详情" />
               <el-table-column prop="createdAt" label="时间" />
@@ -176,6 +200,75 @@ const logs = ref<any[]>([])
 const userForm = reactive({ username: '', name: '', role: 'PATIENT', password: '123456' })
 const medicineForm = reactive<any>({ id: undefined, name: '', effect: '', usageInstruction: '', price: 0, stock: 0, onShelf: true })
 const announcementForm = reactive<any>({ id: undefined, title: '', category: '通知', content: '', status: 'PUBLISHED' })
+
+const roleMap: Record<string, string> = {
+  PATIENT: '患者',
+  DOCTOR: '医生',
+  ADMIN: '管理员'
+}
+const accountStatusMap: Record<string, string> = {
+  ENABLED: '启用',
+  DISABLED: '禁用'
+}
+const reviewStatusMap: Record<string, string> = {
+  PENDING: '待审核',
+  APPROVED: '已通过',
+  REJECTED: '已拒绝'
+}
+const announcementStatusMap: Record<string, string> = {
+  DRAFT: '草稿',
+  SCHEDULED: '定时发布',
+  PUBLISHED: '已发布',
+  OFFLINE: '已下线'
+}
+const orderStatusMap: Record<string, string> = {
+  PENDING_PAY: '待支付',
+  PAID: '已支付',
+  SHIPPED: '已发货',
+  COMPLETED: '已完成',
+  REFUND_REQUESTED: '退款申请中',
+  REFUNDED: '已退款',
+  CANCELLED: '已取消'
+}
+
+function roleLabel(role: string) {
+  return roleMap[role] || role || '-'
+}
+
+function accountStatusLabel(status: string) {
+  return accountStatusMap[status] || status || '-'
+}
+
+function reviewStatusLabel(status: string) {
+  return reviewStatusMap[status] || status || '-'
+}
+
+function announcementStatusLabel(status: string) {
+  return announcementStatusMap[status] || status || '-'
+}
+
+function orderStatusLabel(status: string) {
+  return orderStatusMap[status] || status || '-'
+}
+
+function reviewStatusTag(status: string) {
+  if (status === 'APPROVED') return 'success'
+  if (status === 'REJECTED') return 'danger'
+  return 'warning'
+}
+
+function announcementStatusTag(status: string) {
+  if (status === 'PUBLISHED') return 'success'
+  if (status === 'OFFLINE') return 'info'
+  return 'warning'
+}
+
+function orderStatusTag(status: string) {
+  if (['PAID', 'SHIPPED'].includes(status)) return 'success'
+  if (['REFUND_REQUESTED', 'PENDING_PAY'].includes(status)) return 'warning'
+  if (['REFUNDED', 'CANCELLED'].includes(status)) return 'danger'
+  return 'info'
+}
 
 async function loadAll() {
   stats.value = await apiGet('/admin/stats')

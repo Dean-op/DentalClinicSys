@@ -15,7 +15,7 @@
       <header class="topbar">
         <div>
           <div class="page-title">医生工作台</div>
-          <div class="muted">{{ profile?.name }} · {{ profile?.reviewStatus }}</div>
+          <div class="muted">{{ profile?.name }} · {{ reviewStatusLabel(profile?.reviewStatus) }}</div>
         </div>
         <el-button icon="SwitchButton" @click="logout">退出</el-button>
       </header>
@@ -71,7 +71,11 @@
               <el-table-column label="时间" prop="appointment.timeSlot" width="110" />
               <el-table-column label="症状" prop="appointment.symptoms" />
               <el-table-column label="需求" prop="appointment.demand" />
-              <el-table-column label="状态" prop="appointment.status" width="120" />
+              <el-table-column label="状态" width="120">
+                <template #default="{ row }">
+                  <el-tag :type="appointmentStatusTag(row.appointment.status)">{{ appointmentStatusLabel(row.appointment.status) }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="操作" width="220">
                 <template #default="{ row }">
                   <el-button type="success" link @click="confirmAppointment(row)">确认</el-button>
@@ -92,7 +96,11 @@
               <el-table-column label="患者" prop="patient.name" width="120" />
               <el-table-column label="时间" prop="appointment.timeSlot" width="110" />
               <el-table-column label="症状" prop="appointment.symptoms" />
-              <el-table-column label="状态" prop="appointment.status" width="130" />
+              <el-table-column label="状态" width="130">
+                <template #default="{ row }">
+                  <el-tag :type="appointmentStatusTag(row.appointment.status)">{{ appointmentStatusLabel(row.appointment.status) }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="操作" width="140">
                 <template #default="{ row }">
                   <el-button type="primary" link @click="startReception(row)">进入接诊</el-button>
@@ -101,7 +109,7 @@
             </el-table>
           </el-tab-pane>
 
-          <el-tab-pane label="接诊与处方" name="records">
+          <el-tab-pane label="接诊管理" name="records">
             <el-alert v-if="!selectedEncounter" type="warning" :closable="false" title="请先从“待接诊”选择患者进入接诊。" />
             <div v-else>
               <el-descriptions border :column="3" size="small" class="mb">
@@ -110,11 +118,11 @@
                 <el-descriptions-item label="预约时间">{{ selectedEncounter.appointment.timeSlot }}</el-descriptions-item>
                 <el-descriptions-item label="症状">{{ selectedEncounter.appointment.symptoms }}</el-descriptions-item>
                 <el-descriptions-item label="需求">{{ selectedEncounter.appointment.demand || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="状态">{{ selectedEncounter.appointment.status }}</el-descriptions-item>
+                <el-descriptions-item label="状态">{{ appointmentStatusLabel(selectedEncounter.appointment.status) }}</el-descriptions-item>
               </el-descriptions>
 
               <el-row :gutter="16">
-                <el-col :md="14" :xs="24">
+                <el-col :md="15" :xs="24">
                   <el-form :model="recordForm" label-width="90px">
                     <el-form-item label="主诉"><el-input v-model="recordForm.chiefComplaint" /></el-form-item>
                     <el-form-item label="现病史"><el-input v-model="recordForm.presentIllness" type="textarea" /></el-form-item>
@@ -130,23 +138,11 @@
                     <el-button type="primary" icon="DocumentChecked" @click="saveRecord">保存病例并完成接诊</el-button>
                   </el-form>
 
-                  <el-divider content-position="left">电子药单</el-divider>
-                  <div class="toolbar">
-                    <el-select v-model="prescriptionMedicineId" placeholder="选择药品" style="width: 220px">
-                      <el-option v-for="item in medicines" :key="item.id" :label="`${item.name}（库存 ${item.stock}）`" :value="item.id" />
-                    </el-select>
-                    <el-input v-model="prescriptionItem.frequency" placeholder="频次，如每日2次" style="width: 150px" />
-                    <el-input v-model="prescriptionItem.dosage" placeholder="剂量，如每次10ml" style="width: 160px" />
-                    <el-input-number v-model="prescriptionItem.days" :min="1" />
-                  </div>
-                  <div class="toolbar">
-                    <el-input v-model="prescriptionForm.note" placeholder="医嘱" style="width: 360px" />
-                    <el-button type="success" icon="Plus" :disabled="!prescriptionForm.recordId" @click="createPrescription">开具药单</el-button>
-                  </div>
                 </el-col>
 
-                <el-col :md="10" :xs="24">
+                <el-col :md="9" :xs="24">
                   <el-divider content-position="left">患者历史记录</el-divider>
+                  <el-alert type="info" :closable="false" title="这里自动显示当前接诊患者的既往病例，用于连续性诊疗参考。" />
                   <el-table :data="patientHistory" size="small" stripe>
                     <el-table-column prop="diagnosis" label="诊断" />
                     <el-table-column prop="treatmentPlan" label="治疗方案" />
@@ -157,9 +153,86 @@
             </div>
           </el-tab-pane>
 
+          <el-tab-pane label="电子药单" name="prescriptions">
+            <el-alert v-if="!selectedEncounter" type="warning" :closable="false" title="请先从“待接诊”进入患者接诊，再为本次病例开具药单。" />
+            <el-alert v-else-if="!prescriptionForm.recordId" type="info" :closable="false" title="请先在“接诊管理”保存病例，系统会把药单关联到该病例。" />
+            <div v-else>
+              <el-descriptions border :column="3" size="small" class="mb">
+                <el-descriptions-item label="患者">{{ selectedEncounter.patient.name }}</el-descriptions-item>
+                <el-descriptions-item label="病例编号">{{ prescriptionForm.recordId }}</el-descriptions-item>
+                <el-descriptions-item label="预约时间">{{ selectedEncounter.appointment.visitDate }} {{ selectedEncounter.appointment.timeSlot }}</el-descriptions-item>
+              </el-descriptions>
+
+              <el-row :gutter="16">
+                <el-col :md="11" :xs="24">
+                  <el-form label-width="80px">
+                    <el-form-item label="药品">
+                      <el-select v-model="prescriptionMedicineId" placeholder="选择药品" filterable>
+                        <el-option v-for="item in medicines" :key="item.id" :label="`${item.name}（库存 ${item.stock}）`" :value="item.id" />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="频次">
+                      <el-input v-model="prescriptionItem.frequency" placeholder="如：每日2次" />
+                    </el-form-item>
+                    <el-form-item label="剂量">
+                      <el-input v-model="prescriptionItem.dosage" placeholder="如：每次10ml" />
+                    </el-form-item>
+                    <el-form-item label="天数">
+                      <el-input-number v-model="prescriptionItem.days" :min="1" />
+                    </el-form-item>
+                    <el-form-item label="医嘱">
+                      <el-input v-model="prescriptionForm.note" type="textarea" placeholder="填写注意事项、复诊要求等" />
+                    </el-form-item>
+                    <el-button type="success" icon="Plus" @click="createPrescription">开具药单</el-button>
+                  </el-form>
+                </el-col>
+
+                <el-col :md="13" :xs="24">
+                  <el-divider content-position="left">药单预览</el-divider>
+                  <div class="prescription-preview">
+                    <div class="prescription-head">
+                      <strong>口腔诊所电子药单</strong>
+                      <span>{{ selectedEncounter.patient.name }}</span>
+                    </div>
+                    <el-table :data="prescriptionPreview" size="small" border>
+                      <el-table-column prop="medicineName" label="药品" />
+                      <el-table-column prop="frequency" label="频次" width="110" />
+                      <el-table-column prop="dosage" label="剂量" width="130" />
+                      <el-table-column prop="days" label="天数" width="80" />
+                    </el-table>
+                    <div class="prescription-note">医嘱：{{ prescriptionForm.note || '暂无' }}</div>
+                  </div>
+
+                  <el-divider content-position="left">已开药单</el-divider>
+                  <div v-for="prescription in issuedPrescriptions" :key="prescription.prescription.id" class="issued-prescription">
+                    <div class="prescription-head">
+                      <strong>{{ prescription.prescription.note || '处方医嘱' }}</strong>
+                      <span>{{ prescription.prescription.createdAt || '刚刚开具' }}</span>
+                    </div>
+                    <el-table :data="prescription.items" size="small">
+                      <el-table-column prop="medicineName" label="药品" />
+                      <el-table-column prop="frequency" label="频次" />
+                      <el-table-column prop="dosage" label="剂量" />
+                      <el-table-column prop="days" label="天数" width="80" />
+                    </el-table>
+                  </div>
+                  <el-empty v-if="!issuedPrescriptions.length" description="本次接诊暂未开具药单" :image-size="70" />
+                </el-col>
+              </el-row>
+            </div>
+          </el-tab-pane>
+
           <el-tab-pane label="历史查询" name="history">
+            <el-alert type="info" :closable="false" title="历史查询用于查看当前医生接触过的患者记录。先从下拉框选择患者，再查询其既往病例。" />
             <div class="toolbar">
-              <el-input-number v-model="historyPatientId" :min="1" />
+              <el-select v-model="historyPatientId" filterable placeholder="选择患者" style="width: 260px">
+                <el-option
+                  v-for="patient in knownPatients"
+                  :key="patient.id"
+                  :label="`${patient.name}（ID ${patient.id}）`"
+                  :value="patient.id"
+                />
+              </el-select>
               <el-button type="primary" icon="Search" @click="loadPatientHistory(historyPatientId)">查询患者历史</el-button>
             </div>
             <el-table :data="historyRecords" stripe>
@@ -209,7 +282,8 @@ const tabs = [
   { name: 'schedules', label: '出诊排班', icon: 'Calendar' },
   { name: 'appointments', label: '预约审核', icon: 'Tickets' },
   { name: 'reception', label: '待接诊', icon: 'FirstAidKit' },
-  { name: 'records', label: '接诊与处方', icon: 'Document' },
+  { name: 'records', label: '接诊管理', icon: 'Document' },
+  { name: 'prescriptions', label: '电子药单', icon: 'Memo' },
   { name: 'history', label: '历史查询', icon: 'Search' },
   { name: 'stats', label: '留言统计', icon: 'DataAnalysis' }
 ]
@@ -226,12 +300,29 @@ const receptionDate = ref(today)
 const selectedEncounter = ref<any>(null)
 const patientHistory = ref<any[]>([])
 const historyRecords = ref<any[]>([])
-const historyPatientId = ref(1)
+const historyPatientId = ref<number>()
+const issuedPrescriptions = ref<any[]>([])
 const scheduleForm = reactive<any>({ id: undefined, workDate: '', startTime: '09:00', endTime: '12:00', capacity: 8, bookedCount: 0 })
 const recordForm = reactive<any>({ patientId: undefined, appointmentId: undefined, chiefComplaint: '', presentIllness: '', examination: '', diagnosis: '', treatmentPlan: '', reportImagePath: '' })
 const prescriptionForm = reactive<any>({ recordId: undefined, patientId: undefined, note: '' })
 const prescriptionItem = reactive<any>({ frequency: '每日2次', dosage: '遵医嘱', days: 3 })
 const prescriptionMedicineId = ref<number>()
+
+const appointmentStatusMap: Record<string, string> = {
+  SUBMITTED: '待审核',
+  CONFIRMED: '已确认',
+  REJECTED: '已拒绝',
+  RESCHEDULED: '已改期',
+  CANCELLED: '已取消',
+  COMPLETED: '已完成',
+  NO_SHOW: '爽约'
+}
+
+const reviewStatusMap: Record<string, string> = {
+  PENDING: '待审核',
+  APPROVED: '已通过',
+  REJECTED: '已拒绝'
+}
 
 const reviewAppointments = computed(() => appointments.value.filter((row) => row.appointment.status === 'SUBMITTED'))
 const receptionAppointments = computed(() =>
@@ -240,6 +331,38 @@ const receptionAppointments = computed(() =>
     row.appointment.visitDate === receptionDate.value
   )
 )
+const knownPatients = computed(() => {
+  const map = new Map<number, any>()
+  appointments.value.forEach((row) => {
+    if (row.patient?.id) map.set(row.patient.id, row.patient)
+  })
+  return Array.from(map.values())
+})
+const selectedMedicine = computed(() => medicines.value.find((item) => item.id === prescriptionMedicineId.value))
+const prescriptionPreview = computed(() => {
+  if (!selectedMedicine.value) return []
+  return [{
+    medicineName: selectedMedicine.value.name,
+    frequency: prescriptionItem.frequency || '-',
+    dosage: prescriptionItem.dosage || '-',
+    days: prescriptionItem.days || '-'
+  }]
+})
+
+function appointmentStatusLabel(status: string) {
+  return appointmentStatusMap[status] || status || '-'
+}
+
+function reviewStatusLabel(status?: string) {
+  return status ? reviewStatusMap[status] || status : '-'
+}
+
+function appointmentStatusTag(status: string) {
+  if (['CONFIRMED', 'RESCHEDULED'].includes(status)) return 'success'
+  if (['REJECTED', 'CANCELLED', 'NO_SHOW'].includes(status)) return 'danger'
+  if (status === 'COMPLETED') return 'info'
+  return 'warning'
+}
 
 async function loadAll() {
   profile.value = await apiGet('/doctor/profile')
@@ -321,6 +444,8 @@ async function startReception(row: any) {
     reportImagePath: ''
   })
   Object.assign(prescriptionForm, { recordId: undefined, patientId: row.patient.id, note: '' })
+  prescriptionMedicineId.value = undefined
+  issuedPrescriptions.value = []
   await loadPatientHistory(row.patient.id, true)
   activeTab.value = 'records'
 }
@@ -338,21 +463,36 @@ async function saveRecord() {
   const saved = await apiPost<any>('/doctor/records', recordForm)
   prescriptionForm.recordId = saved.id
   prescriptionForm.patientId = saved.patientId
-  ElMessage.success('病例已保存，预约已标记为完成并通知患者')
+  ElMessage.success('病例已保存，预约已标记为完成并通知患者，可继续开具电子药单')
   await loadAppointments()
+  activeTab.value = 'prescriptions'
 }
 
 async function createPrescription() {
   if (!prescriptionForm.recordId) return ElMessage.warning('请先保存病例')
   if (!prescriptionMedicineId.value) return ElMessage.warning('请选择药品')
-  await apiPost('/doctor/prescriptions', {
+  const medicine = selectedMedicine.value
+  const item = {
+    medicineId: prescriptionMedicineId.value,
+    medicineName: medicine?.name || '未命名药品',
+    frequency: prescriptionItem.frequency,
+    dosage: prescriptionItem.dosage,
+    days: prescriptionItem.days
+  }
+  const saved = await apiPost<any>('/doctor/prescriptions', {
     prescription: prescriptionForm,
-    items: [{ medicineId: prescriptionMedicineId.value, ...prescriptionItem }]
+    items: [item]
+  })
+  issuedPrescriptions.value.unshift({
+    prescription: saved,
+    items: [{ id: `${saved.id}-${Date.now()}`, ...item }]
   })
   ElMessage.success('处方已开具，并生成患者用药提醒')
+  prescriptionMedicineId.value = undefined
 }
 
-async function loadPatientHistory(patientId: number, forReception = false) {
+async function loadPatientHistory(patientId?: number, forReception = false) {
+  if (!patientId) return ElMessage.warning('请先选择患者')
   const rows = await apiGet(`/doctor/patients/${patientId}/records`)
   if (forReception) patientHistory.value = rows
   else historyRecords.value = rows
@@ -385,5 +525,27 @@ onMounted(loadAll)
 }
 .upload-link {
   margin-left: 12px;
+}
+.prescription-preview,
+.issued-prescription {
+  border: 1px solid #dfe9eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+.issued-prescription + .issued-prescription {
+  margin-top: 10px;
+}
+.prescription-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: #2d4c52;
+}
+.prescription-note {
+  margin-top: 10px;
+  color: #4f6468;
+  line-height: 1.6;
 }
 </style>

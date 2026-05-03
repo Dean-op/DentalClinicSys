@@ -97,7 +97,11 @@
               <el-table-column label="药品名称" prop="medicineNames" min-width="220" />
               <el-table-column label="金额" prop="order.totalAmount" width="100" />
               <el-table-column label="配送" prop="order.deliveryMethod" width="110" />
-              <el-table-column label="状态" prop="order.status" width="140" />
+              <el-table-column label="状态" width="140">
+                <template #default="{ row }">
+                  <el-tag :type="orderStatusTag(row.order.status)">{{ orderStatusLabel(row.order.status) }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="下单时间" prop="order.createdAt" width="180" />
               <el-table-column label="操作" width="120">
                 <template #default="{ row }">
@@ -120,7 +124,11 @@
               <el-table-column label="医生" prop="doctor.name" width="120" />
               <el-table-column label="日期" prop="appointment.visitDate" width="130" />
               <el-table-column label="时间" prop="appointment.timeSlot" width="110" />
-              <el-table-column label="状态" prop="appointment.status" width="140" />
+              <el-table-column label="状态" width="140">
+                <template #default="{ row }">
+                  <el-tag :type="appointmentStatusTag(row.appointment.status)">{{ appointmentStatusLabel(row.appointment.status) }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="通知/原因" prop="appointment.statusReason" min-width="220" />
               <el-table-column label="症状" prop="appointment.symptoms" />
               <el-table-column label="操作" width="110">
@@ -133,13 +141,87 @@
             </el-table>
           </el-tab-pane>
 
-          <el-tab-pane label="病例与AI" name="ai">
+          <el-tab-pane label="病例查看" name="records">
             <el-row :gutter="16">
-              <el-col :md="12" :xs="24">
+              <el-col :md="15" :xs="24">
+                <el-table :data="records" stripe>
+                  <el-table-column type="expand">
+                    <template #default="{ row }">
+                      <div class="record-detail">
+                        <el-descriptions :column="1" border size="small">
+                          <el-descriptions-item label="主诉">{{ row.record.chiefComplaint || '-' }}</el-descriptions-item>
+                          <el-descriptions-item label="现病史">{{ row.record.presentIllness || '-' }}</el-descriptions-item>
+                          <el-descriptions-item label="检查结果">{{ row.record.examination || '-' }}</el-descriptions-item>
+                          <el-descriptions-item label="检查报告">
+                            <el-link v-if="row.record.reportImagePath" :href="row.record.reportImagePath" target="_blank" type="primary">查看报告</el-link>
+                            <span v-else>-</span>
+                          </el-descriptions-item>
+                        </el-descriptions>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="doctor.name" label="医生" width="110" />
+                  <el-table-column prop="record.diagnosis" label="诊断" />
+                  <el-table-column prop="record.treatmentPlan" label="治疗方案" />
+                  <el-table-column prop="record.createdAt" label="时间" width="180" />
+                </el-table>
+              </el-col>
+
+              <el-col :md="9" :xs="24">
+                <el-divider content-position="left">用药记录</el-divider>
+                <div v-for="record in records" :key="record.record.id" class="prescription-card">
+                  <div class="prescription-title">{{ record.record.diagnosis || '未填写诊断' }}</div>
+                  <div v-if="record.prescriptions?.length">
+                    <div v-for="prescription in record.prescriptions" :key="prescription.prescription.id" class="prescription-line">
+                      <strong>{{ prescription.prescription.note || '处方医嘱' }}</strong>
+                      <div v-for="item in prescription.items" :key="item.id">
+                        {{ item.medicineName }}，{{ item.frequency || '-' }}，{{ item.dosage || '-' }}，{{ item.days || '-' }} 天
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="muted">本次病例暂无处方药单</div>
+                </div>
+                <el-empty v-if="!records.length" description="暂无病例记录" :image-size="70" />
+
+                <el-divider content-position="left">用药提醒</el-divider>
+                <el-alert
+                  v-for="alert in reminderAlerts"
+                  :key="alert.reminder.id"
+                  class="mt"
+                  type="error"
+                  :closable="false"
+                  :title="alert.message"
+                >
+                  <template #default>
+                    <el-button size="small" type="primary" @click="quickBuy(alert.medicine)">立即购药</el-button>
+                  </template>
+                </el-alert>
+                <el-empty v-if="!reminderAlerts.length" description="暂无即将用完的药品" :image-size="70" />
+                <el-table :data="reminders" stripe class="mt">
+                  <el-table-column prop="medicineName" label="药品" />
+                  <el-table-column prop="expectedRunOutDate" label="预计用完" />
+                  <el-table-column label="状态" width="90">
+                    <template #default="{ row }">
+                      <el-tag :type="row.warned ? 'danger' : 'success'">{{ row.warned ? '预警' : '正常' }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="90">
+                    <template #default="{ row }">
+                      <el-button type="primary" link @click="buyReminder(row)">购药</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </el-col>
+            </el-row>
+          </el-tab-pane>
+
+          <el-tab-pane label="AI牙医" name="ai">
+            <el-row :gutter="16">
+              <el-col :md="14" :xs="24">
                 <el-input v-model="symptomInput" type="textarea" :rows="5" placeholder="请输入牙痛、牙龈出血、口臭等症状" />
                 <div class="toolbar mt">
                   <el-button type="primary" icon="MagicStick" :loading="consulting" @click="consult">AI牙医初评</el-button>
-                  <el-button icon="Refresh" @click="loadAll">刷新推荐与提醒</el-button>
+                  <el-button icon="Refresh" @click="loadAll">刷新推荐</el-button>
                 </div>
                 <el-alert v-if="consultResult" class="mt" type="warning" :closable="false" :title="consultResult.disclaimer" />
                 <div v-if="consultResult" class="result">
@@ -180,71 +262,13 @@
                 </div>
               </el-col>
 
-              <el-col :md="12" :xs="24">
-                <el-divider content-position="left">AI用药预警</el-divider>
-                <el-alert
-                  v-for="alert in reminderAlerts"
-                  :key="alert.reminder.id"
-                  class="mt"
-                  type="error"
-                  :closable="false"
-                  :title="alert.message"
-                >
-                  <template #default>
-                    <el-button size="small" type="primary" @click="quickBuy(alert.medicine)">立即购药</el-button>
-                  </template>
-                </el-alert>
-                <el-empty v-if="!reminderAlerts.length" description="暂无即将用完的药品" :image-size="70" />
-
-                <el-divider content-position="left">既往病例</el-divider>
-                <el-table :data="records" stripe>
-                  <el-table-column type="expand">
-                    <template #default="{ row }">
-                      <div class="record-detail">
-                        <el-descriptions :column="1" border size="small">
-                          <el-descriptions-item label="主诉">{{ row.record.chiefComplaint || '-' }}</el-descriptions-item>
-                          <el-descriptions-item label="现病史">{{ row.record.presentIllness || '-' }}</el-descriptions-item>
-                          <el-descriptions-item label="检查结果">{{ row.record.examination || '-' }}</el-descriptions-item>
-                          <el-descriptions-item label="检查报告">
-                            <el-link v-if="row.record.reportImagePath" :href="row.record.reportImagePath" target="_blank" type="primary">查看报告</el-link>
-                            <span v-else>-</span>
-                          </el-descriptions-item>
-                          <el-descriptions-item label="用药记录">
-                            <div v-if="row.prescriptions?.length">
-                              <div v-for="prescription in row.prescriptions" :key="prescription.prescription.id" class="prescription-line">
-                                <strong>{{ prescription.prescription.note || '处方' }}</strong>
-                                <div v-for="item in prescription.items" :key="item.id">
-                                  {{ item.medicineName }}，{{ item.frequency || '-' }}，{{ item.dosage || '-' }}，{{ item.days || '-' }} 天
-                                </div>
-                              </div>
-                            </div>
-                            <span v-else>-</span>
-                          </el-descriptions-item>
-                        </el-descriptions>
-                      </div>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="doctor.name" label="医生" width="110" />
-                  <el-table-column prop="record.diagnosis" label="诊断" />
-                  <el-table-column prop="record.treatmentPlan" label="治疗方案" />
-                  <el-table-column prop="record.createdAt" label="时间" width="180" />
-                </el-table>
-
-                <el-divider content-position="left">用药提醒</el-divider>
-                <el-table :data="reminders" stripe>
-                  <el-table-column prop="medicineName" label="药品" />
-                  <el-table-column prop="expectedRunOutDate" label="预计用完" />
-                  <el-table-column label="状态" width="90">
-                    <template #default="{ row }">
-                      <el-tag :type="row.warned ? 'danger' : 'success'">{{ row.warned ? '预警' : '正常' }}</el-tag>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="操作" width="90">
-                    <template #default="{ row }">
-                      <el-button type="primary" link @click="buyReminder(row)">购药</el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
+              <el-col :md="10" :xs="24">
+                <el-alert type="info" :closable="false" title="AI牙医会结合症状规则和外部模型生成初步建议，结果只用于就诊前参考，不能替代医生诊断。" />
+                <div class="ai-steps">
+                  <div>1. 输入主要症状，例如牙痛、牙龈出血、口腔溃疡。</div>
+                  <div>2. 系统匹配科室、医生和可购买药品。</div>
+                  <div>3. 外部 AI 生成初步原因和处理建议。</div>
+                </div>
               </el-col>
             </el-row>
           </el-tab-pane>
@@ -271,7 +295,8 @@ const tabs = [
   { name: 'appointment', label: '在线预约', icon: 'Calendar' },
   { name: 'orders', label: '订单管理', icon: 'Tickets' },
   { name: 'appointments', label: '预约管理', icon: 'Calendar' },
-  { name: 'ai', label: '病例与AI', icon: 'MagicStick' }
+  { name: 'records', label: '病例查看', icon: 'Document' },
+  { name: 'ai', label: 'AI牙医', icon: 'MagicStick' }
 ]
 
 const announcements = ref<any[]>([])
@@ -291,6 +316,48 @@ const consulting = ref(false)
 const appointmentForm = reactive({ doctorId: undefined as number | undefined, visitDate: '', timeSlot: '09:00', symptoms: '', demand: '' })
 
 const appointmentNotices = computed(() => messages.value.filter((item) => item.question?.startsWith('【预约通知】')).slice(0, 5))
+
+const appointmentStatusMap: Record<string, string> = {
+  SUBMITTED: '待审核',
+  CONFIRMED: '已确认',
+  REJECTED: '已拒绝',
+  RESCHEDULED: '已改期',
+  CANCELLED: '已取消',
+  COMPLETED: '已完成',
+  NO_SHOW: '爽约'
+}
+
+const orderStatusMap: Record<string, string> = {
+  PENDING_PAY: '待支付',
+  PAID: '已支付',
+  SHIPPED: '已发货',
+  COMPLETED: '已完成',
+  REFUND_REQUESTED: '退款申请中',
+  REFUNDED: '已退款',
+  CANCELLED: '已取消'
+}
+
+function appointmentStatusLabel(status: string) {
+  return appointmentStatusMap[status] || status || '-'
+}
+
+function orderStatusLabel(status: string) {
+  return orderStatusMap[status] || status || '-'
+}
+
+function appointmentStatusTag(status: string) {
+  if (['CONFIRMED', 'RESCHEDULED'].includes(status)) return 'success'
+  if (['REJECTED', 'CANCELLED', 'NO_SHOW'].includes(status)) return 'danger'
+  if (status === 'COMPLETED') return 'info'
+  return 'warning'
+}
+
+function orderStatusTag(status: string) {
+  if (['PAID', 'SHIPPED'].includes(status)) return 'success'
+  if (['REFUND_REQUESTED', 'PENDING_PAY'].includes(status)) return 'warning'
+  if (['REFUNDED', 'CANCELLED'].includes(status)) return 'danger'
+  return 'info'
+}
 
 async function loadAll() {
   announcements.value = await apiGet('/patient/announcements')
@@ -419,5 +486,25 @@ onMounted(loadAll)
 }
 .prescription-line + .prescription-line {
   margin-top: 8px;
+}
+.prescription-card {
+  border: 1px solid #dfe9eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+.prescription-card + .prescription-card {
+  margin-top: 10px;
+}
+.prescription-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.ai-steps {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+  color: #4f6468;
+  line-height: 1.7;
 }
 </style>
