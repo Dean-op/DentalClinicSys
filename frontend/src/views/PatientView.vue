@@ -7,6 +7,28 @@
           <span class="brand-text">SmileCare <span class="brand-sub">患者中心</span></span>
         </div>
         <div class="user-menu">
+          <el-popover placement="bottom-end" :width="320" trigger="click">
+            <template #reference>
+              <div class="notice-bell">
+                <el-badge :value="appointmentNotices.length" :hidden="appointmentNotices.length === 0" class="notice-badge">
+                  <el-button circle icon="Bell" />
+                </el-badge>
+              </div>
+            </template>
+            <div class="notice-popover">
+              <div class="notice-popover-header">
+                <strong>预约通知</strong>
+                <span class="muted">{{ appointmentNotices.length }} 条新通知</span>
+              </div>
+              <div v-if="appointmentNotices.length === 0" class="empty-notice">暂无新通知</div>
+              <div v-else class="notice-list">
+                <div v-for="notice in appointmentNotices" :key="notice.id" class="notice-item">
+                  <el-icon class="notice-icon"><InfoFilled /></el-icon>
+                  <span class="notice-text">{{ notice.question }}</span>
+                </div>
+              </div>
+            </div>
+          </el-popover>
           <div class="user-greeting">欢迎，{{ auth.user?.profile?.name || auth.user?.username }}</div>
           <el-button plain round icon="SwitchButton" size="small" @click="logout">退出登录</el-button>
         </div>
@@ -134,105 +156,127 @@
           </el-tab-pane>
 
           <el-tab-pane label="预约管理" name="appointments">
-            <el-alert
-              v-for="notice in appointmentNotices"
-              :key="notice.id"
-              class="mt"
-              type="info"
-              :closable="false"
-              :title="notice.question"
-            />
-            <el-table :data="appointments" stripe>
-              <el-table-column label="医生" prop="doctor.name" width="120" />
-              <el-table-column label="日期" prop="appointment.visitDate" width="130" />
-              <el-table-column label="时间" prop="appointment.timeSlot" width="110" />
-              <el-table-column label="状态" width="140">
-                <template #default="{ row }">
-                  <el-tag :type="appointmentStatusTag(row.appointment.status)">{{ appointmentStatusLabel(row.appointment.status) }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="通知/原因" prop="appointment.statusReason" min-width="220" />
-              <el-table-column label="症状" prop="appointment.symptoms" />
-              <el-table-column label="操作" width="110">
-                <template #default="{ row }">
-                  <el-button type="danger" link :disabled="!canCancel(row.appointment.status)" @click="cancelAppointment(row.appointment.id)">
-                    取消
+
+            <div class="appointment-cards">
+              <el-empty v-if="!appointments.length" description="暂无预约记录" :image-size="80" />
+              <el-card v-for="row in appointments" :key="row.appointment.id" class="appointment-card" shadow="hover">
+                <div class="apt-header">
+                  <div class="apt-time">
+                    <el-icon><Calendar /></el-icon>
+                    <strong>{{ row.appointment.visitDate }}</strong>
+                    <span>{{ row.appointment.timeSlot }}</span>
+                  </div>
+                  <el-tag :type="appointmentStatusTag(row.appointment.status)" effect="light" round>
+                    {{ appointmentStatusLabel(row.appointment.status) }}
+                  </el-tag>
+                </div>
+                <div class="apt-body">
+                  <div class="apt-info">
+                    <span class="label">就诊医生：</span>
+                    <span class="value">{{ row.doctor.name }}</span>
+                  </div>
+                  <div class="apt-info">
+                    <span class="label">初步症状：</span>
+                    <span class="value">{{ row.appointment.symptoms || '未填写' }}</span>
+                  </div>
+                  <div v-if="row.appointment.statusReason" class="apt-info alert-text">
+                    <span class="label">通知留言：</span>
+                    <span class="value">{{ row.appointment.statusReason }}</span>
+                  </div>
+                </div>
+                <div class="apt-footer">
+                  <el-button type="danger" plain round size="small" :disabled="!canCancel(row.appointment.status)" @click="cancelAppointment(row.appointment.id)">
+                    取消预约
                   </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
+                </div>
+              </el-card>
+            </div>
           </el-tab-pane>
 
           <el-tab-pane label="病例查看" name="records">
-            <el-row :gutter="16">
+            <el-row :gutter="24">
               <el-col :md="15" :xs="24">
-                <el-table :data="records" stripe>
-                  <el-table-column type="expand">
-                    <template #default="{ row }">
-                      <div class="record-detail">
-                        <el-descriptions :column="1" border size="small">
-                          <el-descriptions-item label="主诉">{{ row.record.chiefComplaint || '-' }}</el-descriptions-item>
-                          <el-descriptions-item label="现病史">{{ row.record.presentIllness || '-' }}</el-descriptions-item>
-                          <el-descriptions-item label="检查结果">{{ row.record.examination || '-' }}</el-descriptions-item>
-                          <el-descriptions-item label="检查报告">
-                            <el-link v-if="row.record.reportImagePath" :href="row.record.reportImagePath" target="_blank" type="primary">查看报告</el-link>
-                            <span v-else>-</span>
-                          </el-descriptions-item>
-                        </el-descriptions>
+                <div class="section-title">就诊时间线</div>
+                <el-empty v-if="!records.length" description="暂无病例记录" :image-size="80" />
+                <el-timeline v-else class="record-timeline">
+                  <el-timeline-item
+                    v-for="row in records"
+                    :key="row.record.id"
+                    :timestamp="row.record.createdAt"
+                    placement="top"
+                    type="primary"
+                    :hollow="true"
+                  >
+                    <el-card class="record-card" shadow="hover">
+                      <div class="record-header">
+                        <div class="diagnosis-title">{{ row.record.diagnosis || '初步诊断未填写' }}</div>
+                        <div class="doctor-badge">
+                          <el-icon><Avatar /></el-icon> 主治医生: {{ row.doctor.name }}
+                        </div>
                       </div>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="doctor.name" label="医生" width="110" />
-                  <el-table-column prop="record.diagnosis" label="诊断" />
-                  <el-table-column prop="record.treatmentPlan" label="治疗方案" />
-                  <el-table-column prop="record.createdAt" label="时间" width="180" />
-                </el-table>
+                      <el-descriptions :column="1" border size="small" class="record-desc mt">
+                        <el-descriptions-item label="主诉">{{ row.record.chiefComplaint || '-' }}</el-descriptions-item>
+                        <el-descriptions-item label="现病史">{{ row.record.presentIllness || '-' }}</el-descriptions-item>
+                        <el-descriptions-item label="检查结果">{{ row.record.examination || '-' }}</el-descriptions-item>
+                        <el-descriptions-item label="治疗方案">{{ row.record.treatmentPlan || '-' }}</el-descriptions-item>
+                        <el-descriptions-item label="检查报告">
+                          <el-link v-if="row.record.reportImagePath" :href="row.record.reportImagePath" target="_blank" type="primary">
+                            <el-icon><Document /></el-icon> 查看影像/报告
+                          </el-link>
+                          <span v-else class="muted">无</span>
+                        </el-descriptions-item>
+                      </el-descriptions>
+                    </el-card>
+                  </el-timeline-item>
+                </el-timeline>
               </el-col>
 
               <el-col :md="9" :xs="24">
-                <el-divider content-position="left">用药记录</el-divider>
-                <div v-for="record in records" :key="record.record.id" class="prescription-card">
-                  <div class="prescription-title">{{ record.record.diagnosis || '未填写诊断' }}</div>
-                  <div v-if="record.prescriptions?.length">
-                    <div v-for="prescription in record.prescriptions" :key="prescription.prescription.id" class="prescription-line">
-                      <strong>{{ prescription.prescription.note || '处方医嘱' }}</strong>
-                      <div v-for="item in prescription.items" :key="item.id">
-                        {{ item.medicineName }}，{{ item.frequency || '-' }}，{{ item.dosage || '-' }}，{{ item.days || '-' }} 天
+                <div class="side-panel-wrapper">
+                  <div class="section-title">历史用药单</div>
+                  <div v-for="record in records" :key="record.record.id">
+                    <div v-if="record.prescriptions?.length" class="prescription-card modern-card">
+                      <div class="prescription-title">{{ record.record.diagnosis || '诊断用药' }}</div>
+                      <div v-for="prescription in record.prescriptions" :key="prescription.prescription.id" class="prescription-line">
+                        <div class="presc-note"><el-icon><InfoFilled /></el-icon> {{ prescription.prescription.note || '处方医嘱' }}</div>
+                        <div v-for="item in prescription.items" :key="item.id" class="presc-item">
+                          <span class="med-name">{{ item.medicineName }}</span>
+                          <span class="med-usage">{{ item.frequency || '-' }} · 每次{{ item.dosage || '-' }} · {{ item.days || '-' }}天</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div v-else class="muted">本次病例暂无处方药单</div>
-                </div>
-                <el-empty v-if="!records.length" description="暂无病例记录" :image-size="70" />
+                  <el-empty v-if="!records.some(r => r.prescriptions?.length)" description="暂无处方药单" :image-size="60" />
 
-                <el-divider content-position="left">用药提醒</el-divider>
-                <el-alert
-                  v-for="alert in reminderAlerts"
-                  :key="alert.reminder.id"
-                  class="mt"
-                  type="error"
-                  :closable="false"
-                  :title="alert.message"
-                >
-                  <template #default>
-                    <el-button size="small" type="primary" @click="quickBuy(alert.medicine)">立即购药</el-button>
-                  </template>
-                </el-alert>
-                <el-empty v-if="!reminderAlerts.length" description="暂无即将用完的药品" :image-size="70" />
-                <el-table :data="reminders" stripe class="mt">
-                  <el-table-column prop="medicineName" label="药品" />
-                  <el-table-column prop="expectedRunOutDate" label="预计用完" />
-                  <el-table-column label="状态" width="90">
-                    <template #default="{ row }">
-                      <el-tag :type="row.warned ? 'danger' : 'success'">{{ row.warned ? '预警' : '正常' }}</el-tag>
+                  <div class="section-title mt-large">用药提醒</div>
+                  <el-alert
+                    v-for="alert in reminderAlerts"
+                    :key="alert.reminder.id"
+                    class="mb"
+                    type="error"
+                    show-icon
+                    :closable="false"
+                    :title="alert.message"
+                  >
+                    <template #default>
+                      <el-button size="small" type="danger" plain @click="quickBuy(alert.medicine)" style="margin-top:8px">快速补药</el-button>
                     </template>
-                  </el-table-column>
-                  <el-table-column label="操作" width="90">
-                    <template #default="{ row }">
-                      <el-button type="primary" link @click="buyReminder(row)">购药</el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
+                  </el-alert>
+                  <el-empty v-if="!reminderAlerts.length && !reminders.length" description="近期无需补药" :image-size="60" />
+                  
+                  <div class="reminder-list" v-if="reminders.length">
+                    <div v-for="row in reminders" :key="row.medicineName" class="reminder-item modern-card">
+                      <div class="rem-info">
+                        <strong>{{ row.medicineName }}</strong>
+                        <span class="rem-date">预计用完: {{ row.expectedRunOutDate }}</span>
+                      </div>
+                      <div class="rem-actions">
+                        <el-tag size="small" :type="row.warned ? 'danger' : 'success'">{{ row.warned ? '库存告急' : '正常' }}</el-tag>
+                        <el-button type="primary" link size="small" @click="buyReminder(row)">回购</el-button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </el-col>
             </el-row>
           </el-tab-pane>
@@ -696,8 +740,194 @@ onMounted(loadAll)
 .narrow-form {
   max-width: 620px;
 }
+.mb { margin-bottom: 12px; }
+.mt-large { margin-top: 24px; }
+
+.notice-carousel {
+  border-radius: 8px;
+  overflow: hidden;
+}
+.notice-carousel :deep(.el-alert) {
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 16px;
+  background: #0d9488;
+  border-radius: 2px;
+}
+
+/* Appointments Card */
+.appointment-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.appointment-card {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+.apt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+.apt-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #0f766e;
+  font-size: 15px;
+}
+.apt-time strong { font-weight: 600; }
+.apt-info {
+  margin-bottom: 8px;
+  font-size: 14px;
+  display: flex;
+  gap: 8px;
+}
+.apt-info .label { color: #64748b; white-space: nowrap; }
+.apt-info .value { color: #334155; }
+.alert-text .value { color: #e11d48; font-weight: 500; }
+.apt-footer {
+  margin-top: 16px;
+  text-align: right;
+}
+
+/* Records Timeline */
+.record-timeline { padding-top: 8px; }
+.record-card { border-radius: 12px; border: 1px solid #e2e8f0; }
+.record-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.diagnosis-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f766e;
+}
+.doctor-badge {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.record-desc {
+  --el-descriptions-table-border: 1px solid #f1f5f9;
+  --el-descriptions-item-bordered-label-background: #f8fafc;
+}
+
+/* Modern Side Cards */
+.modern-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+.prescription-card .prescription-title {
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.prescription-line + .prescription-line {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #f1f5f9;
+}
+.presc-note {
+  color: #0891b2;
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.presc-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.med-name { color: #334155; font-weight: 500; }
+.med-usage { color: #64748b; font-size: 13px; }
+
+.reminder-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.rem-info strong { display: block; color: #1e293b; margin-bottom: 4px; }
+.rem-date { color: #94a3b8; font-size: 12px; }
+.rem-actions { display: flex; align-items: center; gap: 8px; }
 .mt {
   margin-top: 12px;
+}
+
+/* Popover Notification Styles */
+.notice-bell {
+  margin-right: 12px;
+  cursor: pointer;
+}
+.notice-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.empty-notice {
+  color: #94a3b8;
+  text-align: center;
+  padding: 16px 0;
+}
+.notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.notice-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: #334155;
+  background: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+.notice-icon {
+  color: #0ea5e9;
+  margin-top: 2px;
 }
 .result {
   background: #f7faf9;
