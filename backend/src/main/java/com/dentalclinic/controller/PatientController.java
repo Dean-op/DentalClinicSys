@@ -135,7 +135,7 @@ public class PatientController {
     }
 
     @GetMapping("/reminders")
-    public ApiResponse<List<MedicationReminder>> reminders() {
+    public ApiResponse<List<Map<String, Object>>> reminders() {
         return ApiResponse.ok(clinicService.myReminders());
     }
 

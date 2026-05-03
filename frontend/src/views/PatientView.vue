@@ -7,10 +7,10 @@
           <span class="brand-text">口腔诊所系统 <span class="brand-sub">患者中心</span></span>
         </div>
         <div class="user-menu">
-          <el-popover placement="bottom-end" :width="320" trigger="click">
+          <el-popover placement="bottom-end" :width="320" trigger="click" @show="markNoticesAsRead">
             <template #reference>
               <div class="notice-bell">
-                <el-badge :value="appointmentNotices.length" :hidden="appointmentNotices.length === 0" class="notice-badge">
+                <el-badge :value="unreadAppointmentNotices.length" :hidden="unreadAppointmentNotices.length === 0" class="notice-badge">
                   <el-button circle icon="Bell" />
                 </el-badge>
               </div>
@@ -18,13 +18,16 @@
             <div class="notice-popover">
               <div class="notice-popover-header">
                 <strong>预约通知</strong>
-                <span class="muted">{{ appointmentNotices.length }} 条新通知</span>
+                <span class="muted">{{ unreadAppointmentNotices.length }} 条未读</span>
               </div>
-              <div v-if="appointmentNotices.length === 0" class="empty-notice">暂无新通知</div>
+              <div v-if="recentAppointmentNotices.length === 0" class="empty-notice">暂无通知</div>
               <div v-else class="notice-list">
-                <div v-for="notice in appointmentNotices" :key="notice.id" class="notice-item">
+                <div v-for="notice in recentAppointmentNotices" :key="notice.id" class="notice-item">
                   <el-icon class="notice-icon"><InfoFilled /></el-icon>
-                  <span class="notice-text">{{ notice.question }}</span>
+                  <span class="notice-text">
+                    {{ notice.question }}
+                    <span v-if="!isNoticeRead(notice.id)" class="notice-dot">新</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -253,29 +256,19 @@
                     v-for="alert in reminderAlerts"
                     :key="alert.reminder.id"
                     class="mb"
-                    type="error"
+                    :type="reminderAlertType(alert.level)"
                     show-icon
                     :closable="false"
-                    :title="alert.message"
+                    :title="alert.title"
                   >
                     <template #default>
-                      <el-button size="small" type="danger" plain @click="quickBuy(alert.medicine)" style="margin-top:8px">快速补药</el-button>
+                      <div class="reminder-message">{{ alert.message }}</div>
+                      <el-button size="small" type="danger" plain @click="quickBuy(alert.medicine)" style="margin-top:8px">
+                        {{ alert.actionText || '补药' }}
+                      </el-button>
                     </template>
                   </el-alert>
-                  <el-empty v-if="!reminderAlerts.length && !reminders.length" description="近期无需补药" :image-size="60" />
-                  
-                  <div class="reminder-list" v-if="reminders.length">
-                    <div v-for="row in reminders" :key="row.medicineName" class="reminder-item modern-card">
-                      <div class="rem-info">
-                        <strong>{{ row.medicineName }}</strong>
-                        <span class="rem-date">预计用完: {{ row.expectedRunOutDate }}</span>
-                      </div>
-                      <div class="rem-actions">
-                        <el-tag size="small" :type="row.warned ? 'danger' : 'success'">{{ row.warned ? '库存告急' : '正常' }}</el-tag>
-                        <el-button type="primary" link size="small" @click="buyReminder(row)">回购</el-button>
-                      </div>
-                    </div>
-                  </div>
+                  <el-empty v-if="!reminderAlerts.length" description="当前处方药量充足，暂不需要补药提醒" :image-size="60" />
                 </div>
               </el-col>
             </el-row>
@@ -388,16 +381,48 @@ const selectedMedicines = ref<any[]>([])
 const orders = ref<any[]>([])
 const appointments = ref<any[]>([])
 const records = ref<any[]>([])
-const reminders = ref<any[]>([])
 const reminderAlerts = ref<any[]>([])
 const messages = ref<any[]>([])
 const deliveryMethod = ref('到店自取')
 const symptomInput = ref('')
 const consultResult = ref<any>(null)
 const consulting = ref(false)
+const seenNoticeIds = ref<number[]>([])
 const appointmentForm = reactive({ doctorId: undefined as number | undefined, visitDate: '', timeSlot: '09:00', symptoms: '', demand: '' })
 
-const appointmentNotices = computed(() => messages.value.filter((item) => item.question?.startsWith('【预约通知】')).slice(0, 5))
+const noticeStorageKey = computed(() => `patient_notice_seen_${auth.user?.id || auth.user?.username || 'anonymous'}`)
+const appointmentNotices = computed(() => messages.value.filter((item) => item.question?.startsWith('【预约通知】')))
+const unreadAppointmentNotices = computed(() => appointmentNotices.value.filter((item) => !seenNoticeIds.value.includes(item.id)))
+const recentAppointmentNotices = computed(() => appointmentNotices.value.slice(0, 5))
+
+function restoreSeenNoticeIds() {
+  const raw = localStorage.getItem(noticeStorageKey.value)
+  if (!raw) {
+    seenNoticeIds.value = []
+    return
+  }
+  try {
+    const parsed = JSON.parse(raw)
+    seenNoticeIds.value = Array.isArray(parsed) ? parsed.map((item) => Number(item)).filter((item) => Number.isFinite(item)) : []
+  } catch {
+    seenNoticeIds.value = []
+  }
+}
+
+function persistSeenNoticeIds() {
+  localStorage.setItem(noticeStorageKey.value, JSON.stringify(seenNoticeIds.value))
+}
+
+function isNoticeRead(id: number) {
+  return seenNoticeIds.value.includes(id)
+}
+
+function markNoticesAsRead() {
+  const ids = new Set(seenNoticeIds.value)
+  appointmentNotices.value.forEach((item) => ids.add(item.id))
+  seenNoticeIds.value = Array.from(ids)
+  persistSeenNoticeIds()
+}
 function formatConsultSectionContent(content: string) {
   return content
     .split(/\r?\n/)
@@ -476,6 +501,12 @@ function orderStatusTag(status: string) {
   return 'info'
 }
 
+function reminderAlertType(level: string) {
+  if (level === 'overdue') return 'error'
+  if (level === 'urgent') return 'warning'
+  return 'info'
+}
+
 async function loadAll() {
   announcements.value = await apiGet('/patient/announcements')
   doctors.value = await apiGet('/patient/doctors')
@@ -483,7 +514,6 @@ async function loadAll() {
   orders.value = await apiGet('/patient/orders')
   appointments.value = await apiGet('/patient/appointments')
   records.value = await apiGet('/patient/records')
-  reminders.value = await apiGet('/patient/reminders')
   reminderAlerts.value = await apiGet('/patient/reminders/alerts')
   messages.value = await apiGet('/patient/messages')
 }
@@ -517,12 +547,6 @@ async function quickBuy(medicine: any) {
   ElMessage.success(`已购买 ${medicine.name}`)
   activeTab.value = 'orders'
   await loadAll()
-}
-
-async function buyReminder(reminder: any) {
-  const medicine = medicines.value.find((item) => item.id === reminder.medicineId)
-  if (medicine) return quickBuy(medicine)
-  return quickBuy({ id: reminder.medicineId, name: reminder.medicineName })
 }
 
 async function createAppointment() {
@@ -559,7 +583,10 @@ function logout() {
   router.push('/login')
 }
 
-onMounted(loadAll)
+onMounted(async () => {
+  restoreSeenNoticeIds()
+  await loadAll()
+})
 </script>
 
 <style scoped>
@@ -878,16 +905,12 @@ onMounted(loadAll)
 .med-name { color: #334155; font-weight: 500; }
 .med-usage { color: #64748b; font-size: 13px; }
 
-.reminder-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.rem-info strong { display: block; color: #1e293b; margin-bottom: 4px; }
-.rem-date { color: #94a3b8; font-size: 12px; }
-.rem-actions { display: flex; align-items: center; gap: 8px; }
 .mt {
   margin-top: 12px;
+}
+.reminder-message {
+  margin-top: 6px;
+  line-height: 1.7;
 }
 
 /* Popover Notification Styles */
@@ -928,6 +951,25 @@ onMounted(loadAll)
 .notice-icon {
   color: #0ea5e9;
   margin-top: 2px;
+}
+.notice-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.6;
+}
+.notice-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
 }
 .result {
   background: #f7faf9;
