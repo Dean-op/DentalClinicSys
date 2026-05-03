@@ -102,14 +102,7 @@ INSERT INTO symptom_rule (id, keywords, possible_cause, recommended_department, 
 
 INSERT INTO ai_config (id, provider_name, base_url, api_key, model, temperature, max_tokens, enabled, remark, updated_at) VALUES
 (1, 'OpenAI兼容接口', 'https://api.openai.com/v1', '', 'gpt-4o-mini', 0.2, 900, 1, '请只在本地数据库填写真实api_key，不要提交到远程仓库。', NOW()) ON DUPLICATE KEY UPDATE
-  provider_name = VALUES(provider_name),
-  base_url = VALUES(base_url),
-  model = VALUES(model),
-  temperature = VALUES(temperature),
-  max_tokens = VALUES(max_tokens),
-  enabled = VALUES(enabled),
-  remark = VALUES(remark),
-  updated_at = VALUES(updated_at);
+  id = id;
 
 INSERT INTO doctor_review (id, patient_id, doctor_id, rating, comment, created_at) VALUES
 (1, 1, 1, 5, '医生解释很耐心，预约流程也方便。', NOW()),

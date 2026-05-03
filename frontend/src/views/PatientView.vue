@@ -22,7 +22,7 @@
 
       <section class="panel">
         <el-tabs v-model="activeTab">
-          <el-tab-pane label="公告" name="announcements">
+          <el-tab-pane label="公告浏览" name="announcements">
             <el-table :data="announcements" stripe>
               <el-table-column prop="category" label="类型" width="120" />
               <el-table-column prop="title" label="标题" width="220" />
@@ -42,7 +42,7 @@
               <el-table-column label="评分" width="90">
                 <template #default="{ row }">{{ row.doctor.rating }}</template>
               </el-table-column>
-              <el-table-column label="操作" width="140">
+              <el-table-column label="操作" width="120">
                 <template #default="{ row }">
                   <el-button type="primary" link @click="selectDoctor(row.doctor.id)">预约</el-button>
                 </template>
@@ -91,35 +91,49 @@
             </el-form>
           </el-tab-pane>
 
-          <el-tab-pane label="订单/预约" name="orders">
-            <el-divider content-position="left">药品订单</el-divider>
+          <el-tab-pane label="订单管理" name="orders">
             <el-table :data="orders" stripe>
               <el-table-column label="订单号" prop="order.orderNo" width="180" />
+              <el-table-column label="药品名称" prop="medicineNames" min-width="220" />
               <el-table-column label="金额" prop="order.totalAmount" width="100" />
               <el-table-column label="配送" prop="order.deliveryMethod" width="110" />
               <el-table-column label="状态" prop="order.status" width="140" />
+              <el-table-column label="下单时间" prop="order.createdAt" width="180" />
               <el-table-column label="操作" width="120">
                 <template #default="{ row }">
                   <el-button type="warning" link @click="refund(row.order.id)">退款</el-button>
                 </template>
               </el-table-column>
             </el-table>
-            <el-divider content-position="left">预约记录</el-divider>
+          </el-tab-pane>
+
+          <el-tab-pane label="预约管理" name="appointments">
+            <el-alert
+              v-for="notice in appointmentNotices"
+              :key="notice.id"
+              class="mt"
+              type="info"
+              :closable="false"
+              :title="notice.question"
+            />
             <el-table :data="appointments" stripe>
               <el-table-column label="医生" prop="doctor.name" width="120" />
               <el-table-column label="日期" prop="appointment.visitDate" width="130" />
               <el-table-column label="时间" prop="appointment.timeSlot" width="110" />
               <el-table-column label="状态" prop="appointment.status" width="140" />
+              <el-table-column label="通知/原因" prop="appointment.statusReason" min-width="220" />
               <el-table-column label="症状" prop="appointment.symptoms" />
               <el-table-column label="操作" width="110">
                 <template #default="{ row }">
-                  <el-button type="danger" link @click="cancelAppointment(row.appointment.id)">取消</el-button>
+                  <el-button type="danger" link :disabled="!canCancel(row.appointment.status)" @click="cancelAppointment(row.appointment.id)">
+                    取消
+                  </el-button>
                 </template>
               </el-table-column>
             </el-table>
           </el-tab-pane>
 
-          <el-tab-pane label="病例/AI" name="ai">
+          <el-tab-pane label="病例与AI" name="ai">
             <el-row :gutter="16">
               <el-col :md="12" :xs="24">
                 <el-input v-model="symptomInput" type="textarea" :rows="5" placeholder="请输入牙痛、牙龈出血、口臭等症状" />
@@ -137,9 +151,7 @@
                 <div v-if="consultResult" class="recommend-grid">
                   <div class="recommend-box">
                     <h3>推荐科室</h3>
-                    <el-tag v-for="dept in consultResult.recommendedDepartments" :key="dept" effect="plain">
-                      {{ dept }}
-                    </el-tag>
+                    <el-tag v-for="dept in consultResult.recommendedDepartments" :key="dept" effect="plain">{{ dept }}</el-tag>
                   </div>
                   <div class="recommend-box">
                     <h3>推荐医生</h3>
@@ -167,6 +179,7 @@
                   </div>
                 </div>
               </el-col>
+
               <el-col :md="12" :xs="24">
                 <el-divider content-position="left">AI用药预警</el-divider>
                 <el-alert
@@ -185,10 +198,38 @@
 
                 <el-divider content-position="left">既往病例</el-divider>
                 <el-table :data="records" stripe>
-                  <el-table-column prop="diagnosis" label="诊断" />
-                  <el-table-column prop="treatmentPlan" label="治疗方案" />
-                  <el-table-column prop="createdAt" label="时间" width="180" />
+                  <el-table-column type="expand">
+                    <template #default="{ row }">
+                      <div class="record-detail">
+                        <el-descriptions :column="1" border size="small">
+                          <el-descriptions-item label="主诉">{{ row.record.chiefComplaint || '-' }}</el-descriptions-item>
+                          <el-descriptions-item label="现病史">{{ row.record.presentIllness || '-' }}</el-descriptions-item>
+                          <el-descriptions-item label="检查结果">{{ row.record.examination || '-' }}</el-descriptions-item>
+                          <el-descriptions-item label="检查报告">
+                            <el-link v-if="row.record.reportImagePath" :href="row.record.reportImagePath" target="_blank" type="primary">查看报告</el-link>
+                            <span v-else>-</span>
+                          </el-descriptions-item>
+                          <el-descriptions-item label="用药记录">
+                            <div v-if="row.prescriptions?.length">
+                              <div v-for="prescription in row.prescriptions" :key="prescription.prescription.id" class="prescription-line">
+                                <strong>{{ prescription.prescription.note || '处方' }}</strong>
+                                <div v-for="item in prescription.items" :key="item.id">
+                                  {{ item.medicineName }}，{{ item.frequency || '-' }}，{{ item.dosage || '-' }}，{{ item.days || '-' }} 天
+                                </div>
+                              </div>
+                            </div>
+                            <span v-else>-</span>
+                          </el-descriptions-item>
+                        </el-descriptions>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="doctor.name" label="医生" width="110" />
+                  <el-table-column prop="record.diagnosis" label="诊断" />
+                  <el-table-column prop="record.treatmentPlan" label="治疗方案" />
+                  <el-table-column prop="record.createdAt" label="时间" width="180" />
                 </el-table>
+
                 <el-divider content-position="left">用药提醒</el-divider>
                 <el-table :data="reminders" stripe>
                   <el-table-column prop="medicineName" label="药品" />
@@ -214,7 +255,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { apiGet, apiPost, apiPut } from '../api'
@@ -228,7 +269,8 @@ const tabs = [
   { name: 'doctors', label: '医生查询', icon: 'Avatar' },
   { name: 'medicines', label: '药品购买', icon: 'ShoppingBag' },
   { name: 'appointment', label: '在线预约', icon: 'Calendar' },
-  { name: 'orders', label: '订单预约', icon: 'Tickets' },
+  { name: 'orders', label: '订单管理', icon: 'Tickets' },
+  { name: 'appointments', label: '预约管理', icon: 'Calendar' },
   { name: 'ai', label: '病例与AI', icon: 'MagicStick' }
 ]
 
@@ -241,11 +283,14 @@ const appointments = ref<any[]>([])
 const records = ref<any[]>([])
 const reminders = ref<any[]>([])
 const reminderAlerts = ref<any[]>([])
+const messages = ref<any[]>([])
 const deliveryMethod = ref('到店自取')
 const symptomInput = ref('')
 const consultResult = ref<any>(null)
 const consulting = ref(false)
 const appointmentForm = reactive({ doctorId: undefined as number | undefined, visitDate: '', timeSlot: '09:00', symptoms: '', demand: '' })
+
+const appointmentNotices = computed(() => messages.value.filter((item) => item.question?.startsWith('【预约通知】')).slice(0, 5))
 
 async function loadAll() {
   announcements.value = await apiGet('/patient/announcements')
@@ -256,11 +301,16 @@ async function loadAll() {
   records.value = await apiGet('/patient/records')
   reminders.value = await apiGet('/patient/reminders')
   reminderAlerts.value = await apiGet('/patient/reminders/alerts')
+  messages.value = await apiGet('/patient/messages')
 }
 
 function selectDoctor(id: number) {
   appointmentForm.doctorId = id
   activeTab.value = 'appointment'
+}
+
+function canCancel(status: string) {
+  return ['SUBMITTED', 'CONFIRMED', 'RESCHEDULED'].includes(status)
 }
 
 async function submitOrder() {
@@ -270,6 +320,7 @@ async function submitOrder() {
     items: selectedMedicines.value.map((item) => ({ medicineId: item.id, quantity: 1 }))
   })
   ElMessage.success('下单成功')
+  activeTab.value = 'orders'
   await loadAll()
 }
 
@@ -292,8 +343,8 @@ async function buyReminder(reminder: any) {
 
 async function createAppointment() {
   await apiPost('/patient/appointments', appointmentForm)
-  ElMessage.success('预约已提交')
-  activeTab.value = 'orders'
+  ElMessage.success('预约已提交，请等待医生确认')
+  activeTab.value = 'appointments'
   await loadAll()
 }
 
@@ -342,28 +393,31 @@ onMounted(loadAll)
   max-height: 320px;
   overflow: auto;
 }
-
 .result pre {
   margin: 8px 0 0;
   white-space: pre-wrap;
   font-family: inherit;
   line-height: 1.7;
 }
-
 .recommend-grid {
   display: grid;
   gap: 12px;
 }
-
 .recommend-box {
   border: 1px solid #dfe9eb;
   border-radius: 8px;
   padding: 12px;
   background: #fff;
 }
-
 .recommend-box h3 {
   font-size: 15px;
   margin: 0 0 10px;
+}
+.record-detail {
+  padding: 10px 18px;
+  background: #fbfdfd;
+}
+.prescription-line + .prescription-line {
+  margin-top: 8px;
 }
 </style>

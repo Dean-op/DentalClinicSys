@@ -41,33 +41,22 @@ public class DoctorController {
 
     @GetMapping("/schedules")
     public ApiResponse<List<DoctorSchedule>> schedules() {
-        DoctorProfile doctor = clinicService.currentDoctor(false);
-        return ApiResponse.ok(clinicService.schedules().selectList(
-            new QueryWrapper<DoctorSchedule>().eq("doctor_id", doctor.id).orderByAsc("work_date", "start_time")
-        ));
+        return ApiResponse.ok(clinicService.myDoctorSchedules());
     }
 
     @PostMapping("/schedules")
     public ApiResponse<DoctorSchedule> createSchedule(@RequestBody DoctorSchedule request) {
-        DoctorProfile doctor = clinicService.currentDoctor(false);
-        request.doctorId = doctor.id;
-        request.bookedCount = request.bookedCount == null ? 0 : request.bookedCount;
-        clinicService.schedules().insert(request);
-        return ApiResponse.ok(request);
+        return ApiResponse.ok(clinicService.createMySchedule(request));
     }
 
     @PutMapping("/schedules/{id}")
     public ApiResponse<DoctorSchedule> updateSchedule(@PathVariable Long id, @RequestBody DoctorSchedule request) {
-        DoctorProfile doctor = clinicService.currentDoctor(false);
-        request.id = id;
-        request.doctorId = doctor.id;
-        clinicService.schedules().updateById(request);
-        return ApiResponse.ok(request);
+        return ApiResponse.ok(clinicService.updateMySchedule(id, request));
     }
 
     @DeleteMapping("/schedules/{id}")
     public ApiResponse<Void> deleteSchedule(@PathVariable Long id) {
-        clinicService.schedules().deleteById(id);
+        clinicService.deleteMySchedule(id);
         return ApiResponse.ok();
     }
 
@@ -116,7 +105,10 @@ public class DoctorController {
     public ApiResponse<List<Message>> messages() {
         DoctorProfile doctor = clinicService.currentDoctor(true);
         return ApiResponse.ok(clinicService.messages().selectList(
-            new QueryWrapper<Message>().eq("doctor_id", doctor.id).orderByDesc("created_at")
+            new QueryWrapper<Message>()
+                .eq("doctor_id", doctor.id)
+                .notLike("question", "【预约通知】")
+                .orderByDesc("created_at")
         ));
     }
 

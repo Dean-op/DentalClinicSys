@@ -125,7 +125,7 @@ public class PatientController {
     }
 
     @GetMapping("/records")
-    public ApiResponse<List<MedicalRecord>> records() {
+    public ApiResponse<List<Map<String, Object>>> records() {
         return ApiResponse.ok(clinicService.myRecords());
     }
 

@@ -235,6 +235,60 @@ public class ClinicService {
         return card;
     }
 
+    public List<DoctorSchedule> myDoctorSchedules() {
+        DoctorProfile doctor = currentDoctor(true);
+        return schedules.selectList(new QueryWrapper<DoctorSchedule>()
+            .eq("doctor_id", doctor.id)
+            .orderByAsc("work_date", "start_time"));
+    }
+
+    public DoctorSchedule createMySchedule(DoctorSchedule request) {
+        DoctorProfile doctor = currentDoctor(true);
+        validateScheduleEditable(request.workDate, request.bookedCount);
+        request.doctorId = doctor.id;
+        request.bookedCount = request.bookedCount == null ? 0 : request.bookedCount;
+        schedules.insert(request);
+        log("CREATE_SCHEDULE", doctor.name + " " + request.workDate + " " + request.startTime + "-" + request.endTime);
+        return request;
+    }
+
+    public DoctorSchedule updateMySchedule(Long id, DoctorSchedule request) {
+        DoctorProfile doctor = currentDoctor(true);
+        DoctorSchedule existing = schedules.selectById(id);
+        if (existing == null || !Objects.equals(existing.doctorId, doctor.id)) {
+            throw new BusinessException("schedule not found");
+        }
+        validateScheduleEditable(existing.workDate, existing.bookedCount);
+        validateScheduleEditable(request.workDate, existing.bookedCount);
+        existing.workDate = request.workDate;
+        existing.startTime = request.startTime;
+        existing.endTime = request.endTime;
+        existing.capacity = request.capacity;
+        schedules.updateById(existing);
+        log("UPDATE_SCHEDULE", doctor.name + " schedule=" + id);
+        return existing;
+    }
+
+    public void deleteMySchedule(Long id) {
+        DoctorProfile doctor = currentDoctor(true);
+        DoctorSchedule existing = schedules.selectById(id);
+        if (existing == null || !Objects.equals(existing.doctorId, doctor.id)) {
+            throw new BusinessException("schedule not found");
+        }
+        validateScheduleEditable(existing.workDate, existing.bookedCount);
+        schedules.deleteById(id);
+        log("DELETE_SCHEDULE", doctor.name + " schedule=" + id);
+    }
+
+    private void validateScheduleEditable(LocalDate workDate, Integer bookedCount) {
+        if (workDate == null || workDate.isBefore(LocalDate.now())) {
+            throw new BusinessException("only future schedules can be changed");
+        }
+        if (bookedCount != null && bookedCount > 0) {
+            throw new BusinessException("schedule already has appointments and cannot be changed");
+        }
+    }
+
     public List<Medicine> shelfMedicines() {
         return medicines.selectList(new QueryWrapper<Medicine>().eq("on_shelf", true).gt("stock", 0));
     }
@@ -314,7 +368,16 @@ public class ClinicService {
     }
 
     public Map<String, Object> orderWithItems(MedicineOrder order) {
-        return Map.of("order", order, "items", orderItems.selectList(new QueryWrapper<OrderItem>().eq("order_id", order.id)));
+        List<OrderItem> items = orderItems.selectList(new QueryWrapper<OrderItem>().eq("order_id", order.id));
+        String medicineNames = items.stream()
+            .map(item -> item.medicineName + " x" + item.quantity)
+            .collect(Collectors.joining("，"));
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("order", order);
+        row.put("items", items);
+        row.put("medicineNames", medicineNames);
+        row.put("createdAt", order.createdAt);
+        return row;
     }
 
     public void updateOrderStatus(Long orderId, OrderStatus status) {
@@ -402,9 +465,27 @@ public class ClinicService {
         appointments.updateById(appointment);
     }
 
-    public List<MedicalRecord> myRecords() {
+    public List<Map<String, Object>> myRecords() {
         PatientProfile patient = currentPatient();
-        return records.selectList(new QueryWrapper<MedicalRecord>().eq("patient_id", patient.id).orderByDesc("created_at"));
+        return records.selectList(new QueryWrapper<MedicalRecord>().eq("patient_id", patient.id).orderByDesc("created_at"))
+            .stream()
+            .map(this::recordWithPrescription)
+            .toList();
+    }
+
+    public Map<String, Object> recordWithPrescription(MedicalRecord record) {
+        List<Prescription> prescriptionRows = prescriptions.selectList(new QueryWrapper<Prescription>().eq("record_id", record.id));
+        List<Map<String, Object>> prescriptionViews = prescriptionRows.stream().map(prescription -> {
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("prescription", prescription);
+            view.put("items", prescriptionItems.selectList(new QueryWrapper<PrescriptionItem>().eq("prescription_id", prescription.id)));
+            return view;
+        }).toList();
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("record", record);
+        view.put("doctor", doctors.selectById(record.doctorId));
+        view.put("prescriptions", prescriptionViews);
+        return view;
     }
 
     public Map<String, Object> consult(String symptoms) {
@@ -490,16 +571,52 @@ public class ClinicService {
         if (appointment == null || !Objects.equals(appointment.doctorId, doctor.id)) {
             throw new BusinessException("appointment not found");
         }
+        if (status == AppointmentStatus.CONFIRMED && appointment.status != AppointmentStatus.SUBMITTED) {
+            throw new BusinessException("only submitted appointments can be confirmed");
+        }
+        if (status == AppointmentStatus.REJECTED && appointment.status != AppointmentStatus.SUBMITTED) {
+            throw new BusinessException("only submitted appointments can be rejected");
+        }
+        if (visitDate != null || timeSlot != null) {
+            status = AppointmentStatus.RESCHEDULED;
+        }
         appointment.status = status;
-        appointment.statusReason = reason;
         if (visitDate != null) {
             appointment.visitDate = visitDate;
         }
         if (timeSlot != null) {
             appointment.timeSlot = timeSlot;
         }
+        appointment.statusReason = appointmentNotice(appointment, doctor, status, reason);
         appointments.updateById(appointment);
+        createAppointmentNotification(appointment, doctor);
         log("DOCTOR_UPDATE_APPOINTMENT", id + " -> " + status);
+    }
+
+    private String appointmentNotice(Appointment appointment, DoctorProfile doctor, AppointmentStatus status, String reason) {
+        if (StringUtils.hasText(reason)) {
+            return reason;
+        }
+        return switch (status) {
+            case CONFIRMED -> "预约已确认，请于 " + appointment.visitDate + " " + appointment.timeSlot + " 到诊，接诊医生：" + doctor.name + "。";
+            case REJECTED -> "预约暂无法接诊，请重新选择其他时间或医生。";
+            case RESCHEDULED -> "预约时间已调整为 " + appointment.visitDate + " " + appointment.timeSlot + "，如不方便可取消后重新预约。";
+            case COMPLETED -> "本次就诊已完成，病例和处方可在患者端查看。";
+            case CANCELLED -> "预约已取消。";
+            case NO_SHOW -> "系统记录为爽约，如有疑问请联系诊所。";
+            default -> "预约状态已更新为 " + status + "。";
+        };
+    }
+
+    private void createAppointmentNotification(Appointment appointment, DoctorProfile doctor) {
+        Message notification = new Message();
+        notification.patientId = appointment.patientId;
+        notification.doctorId = doctor.id;
+        notification.question = "【预约通知】" + appointment.statusReason;
+        notification.reply = "系统自动通知";
+        notification.createdAt = LocalDateTime.now();
+        notification.repliedAt = LocalDateTime.now();
+        messages.insert(notification);
     }
 
     @Transactional
@@ -518,7 +635,9 @@ public class ClinicService {
             Appointment appointment = appointments.selectById(record.appointmentId);
             if (appointment != null) {
                 appointment.status = AppointmentStatus.COMPLETED;
+                appointment.statusReason = "本次就诊已完成，医生已保存病例记录。";
                 appointments.updateById(appointment);
+                createAppointmentNotification(appointment, doctor);
             }
         }
         log("SAVE_RECORD", String.valueOf(record.id));
