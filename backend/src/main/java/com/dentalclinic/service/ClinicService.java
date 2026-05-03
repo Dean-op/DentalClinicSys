@@ -539,22 +539,8 @@ public class ClinicService {
     public Map<String, Object> adminOrderView(MedicineOrder order) {
         Map<String, Object> row = orderWithItems(order);
         row.put("patient", patients.selectById(order.patientId));
-        row.put("paymentStatus", switch (order.status) {
-            case PENDING_PAY -> "待支付";
-            case PAID, SHIPPED, COMPLETED -> "已支付";
-            case REFUND_REQUESTED -> "退款申请中";
-            case REFUNDED -> "已退款";
-            case CANCELLED -> "已取消";
-        });
-        row.put("deliveryStatus", switch (order.status) {
-            case PENDING_PAY -> "待发货";
-            case PAID -> "待发货";
-            case SHIPPED -> "配送中";
-            case COMPLETED -> "已完成";
-            case REFUND_REQUESTED -> "退款处理中";
-            case REFUNDED -> "已退款";
-            case CANCELLED -> "已取消";
-        });
+        row.put("paymentStatus", orderPaymentStatus(order.status));
+        row.put("deliveryStatus", orderDeliveryStatus(order.status));
         return row;
     }
 
@@ -667,15 +653,60 @@ public class ClinicService {
         if (StringUtils.hasText(reason)) {
             return reason;
         }
-        return switch (status) {
-            case CONFIRMED -> "预约已确认，请于 " + appointment.visitDate + " " + appointment.timeSlot + " 到诊，接诊医生：" + doctor.name + "。";
-            case REJECTED -> "预约暂无法接诊，请重新选择其他时间或医生。";
-            case RESCHEDULED -> "预约时间已调整为 " + appointment.visitDate + " " + appointment.timeSlot + "，如不方便可取消后重新预约。";
-            case COMPLETED -> "本次就诊已完成，病例和处方可在患者端查看。";
-            case CANCELLED -> "预约已取消。";
-            case NO_SHOW -> "系统记录为爽约，如有疑问请联系诊所。";
-            default -> "预约状态已更新为 " + status + "。";
-        };
+        if (status == AppointmentStatus.CONFIRMED) {
+            return "预约已确认，请于 " + appointment.visitDate + " " + appointment.timeSlot + " 到诊，接诊医生：" + doctor.name + "。";
+        }
+        if (status == AppointmentStatus.REJECTED) {
+            return "预约暂无法接诊，请重新选择其他时间或医生。";
+        }
+        if (status == AppointmentStatus.RESCHEDULED) {
+            return "预约时间已调整为 " + appointment.visitDate + " " + appointment.timeSlot + "，如不方便可取消后重新预约。";
+        }
+        if (status == AppointmentStatus.COMPLETED) {
+            return "本次就诊已完成，病例和处方可在患者端查看。";
+        }
+        if (status == AppointmentStatus.CANCELLED) {
+            return "预约已取消。";
+        }
+        if (status == AppointmentStatus.NO_SHOW) {
+            return "系统记录为爽约，如有疑问请联系诊所。";
+        }
+        return "预约状态已更新为 " + status + "。";
+    }
+
+    private String orderPaymentStatus(OrderStatus status) {
+        if (status == OrderStatus.PENDING_PAY) {
+            return "待支付";
+        }
+        if (status == OrderStatus.PAID || status == OrderStatus.SHIPPED || status == OrderStatus.COMPLETED) {
+            return "已支付";
+        }
+        if (status == OrderStatus.REFUND_REQUESTED) {
+            return "退款申请中";
+        }
+        if (status == OrderStatus.REFUNDED) {
+            return "已退款";
+        }
+        return "已取消";
+    }
+
+    private String orderDeliveryStatus(OrderStatus status) {
+        if (status == OrderStatus.PENDING_PAY || status == OrderStatus.PAID) {
+            return "待发货";
+        }
+        if (status == OrderStatus.SHIPPED) {
+            return "配送中";
+        }
+        if (status == OrderStatus.COMPLETED) {
+            return "已完成";
+        }
+        if (status == OrderStatus.REFUND_REQUESTED) {
+            return "退款处理中";
+        }
+        if (status == OrderStatus.REFUNDED) {
+            return "已退款";
+        }
+        return "已取消";
     }
 
     private void createAppointmentNotification(Appointment appointment, DoctorProfile doctor) {
