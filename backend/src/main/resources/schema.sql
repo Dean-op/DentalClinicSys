@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS user_account (
   status VARCHAR(20) NOT NULL,
   created_at DATETIME NOT NULL,
   last_login_at DATETIME NULL
-) COMMENT='系统账号表，存储患者、医生、管理员的登录账号、角色和状态';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统账号表，存储患者、医生、管理员的登录账号、角色和状态';
 
 CREATE TABLE IF NOT EXISTS patient_profile (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS patient_profile (
   phone VARCHAR(32) NULL,
   address VARCHAR(255) NULL,
   allergy_history VARCHAR(500) NULL
-) COMMENT='患者基本信息表，存储姓名、性别、联系方式、地址和过敏史';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='患者基本信息表，存储姓名、性别、联系方式、地址和过敏史';
 
 CREATE TABLE IF NOT EXISTS doctor_profile (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS doctor_profile (
   introduction TEXT NULL,
   review_status VARCHAR(20) NOT NULL,
   rating DOUBLE DEFAULT 5
-) COMMENT='医生个人资料表，存储职称、科室、擅长方向、简介、审核状态和评分';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医生个人资料表，存储职称、科室、擅长方向、简介、审核状态和评分';
 
 CREATE TABLE IF NOT EXISTS doctor_qualification (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS doctor_qualification (
   review_comment VARCHAR(255) NULL,
   submitted_at DATETIME NOT NULL,
   reviewed_at DATETIME NULL
-) COMMENT='医生资质审核表，存储执业资格证、职称证明等材料及审核结果';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医生资质审核表，存储执业资格证、职称证明等材料及审核结果';
 
 CREATE TABLE IF NOT EXISTS doctor_schedule (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS doctor_schedule (
   end_time TIME NOT NULL,
   capacity INT NOT NULL DEFAULT 8,
   booked_count INT NOT NULL DEFAULT 0
-) COMMENT='医生出诊排班表，存储医生可预约日期、时间段、容量和已预约数量';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医生出诊排班表，存储医生可预约日期、时间段、容量和已预约数量';
 
 CREATE TABLE IF NOT EXISTS announcement (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS announcement (
   status VARCHAR(20) NOT NULL,
   publish_at DATETIME NULL,
   created_at DATETIME NOT NULL
-) COMMENT='诊所公告表，存储停诊信息、优惠活动、健康科普和节假日安排';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诊所公告表，存储停诊信息、优惠活动、健康科普和节假日安排';
 
 CREATE TABLE IF NOT EXISTS medicine (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS medicine (
   price DECIMAL(10,2) NOT NULL,
   stock INT NOT NULL,
   on_shelf TINYINT(1) NOT NULL DEFAULT 1
-) COMMENT='药品信息表，存储药品名称、功效、用法说明、价格、库存和上下架状态';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='药品信息表，存储药品名称、功效、用法说明、价格、库存和上下架状态';
 
 CREATE TABLE IF NOT EXISTS cart_item (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS cart_item (
   medicine_id BIGINT NOT NULL,
   quantity INT NOT NULL,
   UNIQUE KEY uk_cart_patient_medicine (patient_id, medicine_id)
-) COMMENT='购物车明细表，存储患者临时加入购物车的药品和数量';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='购物车明细表，存储患者临时加入购物车的药品和数量';
 
 CREATE TABLE IF NOT EXISTS medicine_order (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS medicine_order (
   delivery_method VARCHAR(64) NOT NULL,
   status VARCHAR(30) NOT NULL,
   created_at DATETIME NOT NULL
-) COMMENT='药品订单主表，存储订单编号、患者、总金额、配送方式和订单状态';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='药品订单主表，存储订单编号、患者、总金额、配送方式和订单状态';
 
 CREATE TABLE IF NOT EXISTS order_item (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS order_item (
   medicine_name VARCHAR(100) NOT NULL,
   unit_price DECIMAL(10,2) NOT NULL,
   quantity INT NOT NULL
-) COMMENT='药品订单明细表，存储订单中的药品、单价和购买数量';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='药品订单明细表，存储订单中的药品、单价和购买数量';
 
 CREATE TABLE IF NOT EXISTS appointment (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS appointment (
   status VARCHAR(30) NOT NULL,
   status_reason VARCHAR(255) NULL,
   created_at DATETIME NOT NULL
-) COMMENT='预约记录表，存储患者预约医生的日期、时间段、症状需求和处理状态';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='预约记录表，存储患者预约医生的日期、时间段、症状需求和处理状态';
 
 CREATE TABLE IF NOT EXISTS medical_record (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS medical_record (
   treatment_plan TEXT NULL,
   report_image_path VARCHAR(255) NULL,
   created_at DATETIME NOT NULL
-) COMMENT='病例记录表，存储医生为患者记录的主诉、病史、检查、诊断和治疗方案';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='病例记录表，存储医生为患者记录的主诉、病史、检查、诊断和治疗方案';
 
 CREATE TABLE IF NOT EXISTS prescription (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS prescription (
   doctor_id BIGINT NOT NULL,
   note VARCHAR(500) NULL,
   created_at DATETIME NOT NULL
-) COMMENT='电子处方主表，存储医生为患者开具的处方及医嘱';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='电子处方主表，存储医生为患者开具的处方及医嘱';
 
 CREATE TABLE IF NOT EXISTS prescription_item (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS prescription_item (
   frequency VARCHAR(64) NULL,
   dosage VARCHAR(64) NULL,
   days INT NULL
-) COMMENT='电子处方明细表，存储处方中的药品、用药频次、剂量和天数';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='电子处方明细表，存储处方中的药品、用药频次、剂量和天数';
 
 CREATE TABLE IF NOT EXISTS message (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS message (
   reply TEXT NULL,
   created_at DATETIME NOT NULL,
   replied_at DATETIME NULL
-) COMMENT='医患留言表，存储患者留言、医生回复和回复时间';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医患留言表，存储患者留言、医生回复和回复时间';
 
 CREATE TABLE IF NOT EXISTS doctor_review (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS doctor_review (
   rating INT NOT NULL,
   comment VARCHAR(500) NULL,
   created_at DATETIME NOT NULL
-) COMMENT='医生评价表，存储患者对医生的评分和评价内容';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医生评价表，存储患者对医生的评分和评价内容';
 
 CREATE TABLE IF NOT EXISTS symptom_rule (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS symptom_rule (
   recommended_department VARCHAR(64) NOT NULL,
   recommended_medicine_ids VARCHAR(255) NULL,
   advice TEXT NOT NULL
-) COMMENT='症状匹配规则表，存储AI牙医和症状推荐使用的关键词、原因、科室和建议';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='症状匹配规则表，存储AI牙医和症状推荐使用的关键词、原因、科室和建议';
 
 CREATE TABLE IF NOT EXISTS medication_reminder (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS medication_reminder (
   daily_dose INT NOT NULL,
   expected_run_out_date DATE NOT NULL,
   warned TINYINT(1) NOT NULL DEFAULT 0
-) COMMENT='用药提醒表，存储患者药品用量、预计用完日期和预警状态';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用药提醒表，存储患者药品用量、预计用完日期和预警状态';
 
 CREATE TABLE IF NOT EXISTS operation_log (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -191,4 +191,24 @@ CREATE TABLE IF NOT EXISTS operation_log (
   action VARCHAR(100) NOT NULL,
   detail VARCHAR(500) NULL,
   created_at DATETIME NOT NULL
-) COMMENT='系统操作日志表，记录登录、审核、下单、预约、病例等关键操作';
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统操作日志表，记录登录、审核、下单、预约、病例等关键操作';
+
+ALTER TABLE user_account CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE patient_profile CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE doctor_profile CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE doctor_qualification CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE doctor_schedule CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE announcement CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE medicine CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE cart_item CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE medicine_order CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE order_item CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE appointment CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE medical_record CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE prescription CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE prescription_item CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE message CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE doctor_review CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE symptom_rule CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE medication_reminder CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE operation_log CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
