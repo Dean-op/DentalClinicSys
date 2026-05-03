@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -159,6 +160,38 @@ public class ClinicService {
 
     public UserAccount findUser(String username) {
         return users.selectOne(new QueryWrapper<UserAccount>().eq("username", username));
+    }
+
+    public List<Map<String, Object>> adminUserViews() {
+        return users.selectList(new QueryWrapper<UserAccount>().orderByDesc("created_at")).stream().map(account -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("account", account);
+            row.put("linkedName", "-");
+            row.put("linkedType", "-");
+            row.put("doctorName", "-");
+            row.put("patientName", "-");
+            row.put("department", "-");
+            row.put("title", "-");
+            row.put("reviewStatus", null);
+            if (account.role == Role.DOCTOR) {
+                DoctorProfile doctor = doctorByUser(account.id);
+                row.put("linkedName", doctor.name);
+                row.put("linkedType", "医生资料");
+                row.put("doctorName", doctor.name);
+                row.put("department", doctor.department);
+                row.put("title", doctor.title);
+                row.put("reviewStatus", doctor.reviewStatus);
+            } else if (account.role == Role.PATIENT) {
+                PatientProfile patient = patientByUser(account.id);
+                row.put("linkedName", patient.name);
+                row.put("linkedType", "患者资料");
+                row.put("patientName", patient.name);
+            } else {
+                row.put("linkedName", account.username);
+                row.put("linkedType", "管理员账号");
+            }
+            return row;
+        }).toList();
     }
 
     public Map<String, Object> currentMe() {
@@ -483,9 +516,46 @@ public class ClinicService {
         }).toList();
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("record", record);
+        view.put("patient", patients.selectById(record.patientId));
         view.put("doctor", doctors.selectById(record.doctorId));
+        view.put("appointment", record.appointmentId == null ? null : appointments.selectById(record.appointmentId));
         view.put("prescriptions", prescriptionViews);
         return view;
+    }
+
+    public Map<String, Object> prescriptionWithItems(Prescription prescription) {
+        List<PrescriptionItem> items = prescriptionItems.selectList(new QueryWrapper<PrescriptionItem>().eq("prescription_id", prescription.id));
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("prescription", prescription);
+        view.put("record", prescription.recordId == null ? null : records.selectById(prescription.recordId));
+        view.put("patient", patients.selectById(prescription.patientId));
+        view.put("doctor", doctors.selectById(prescription.doctorId));
+        view.put("items", items);
+        view.put("medicineNames", items.stream().map(item -> item.medicineName + " x" + (item.days == null ? "-" : item.days)).collect(Collectors.joining("，")));
+        view.put("riskFlag", auditPrescription(items));
+        return view;
+    }
+
+    public Map<String, Object> adminOrderView(MedicineOrder order) {
+        Map<String, Object> row = orderWithItems(order);
+        row.put("patient", patients.selectById(order.patientId));
+        row.put("paymentStatus", switch (order.status) {
+            case PENDING_PAY -> "待支付";
+            case PAID, SHIPPED, COMPLETED -> "已支付";
+            case REFUND_REQUESTED -> "退款申请中";
+            case REFUNDED -> "已退款";
+            case CANCELLED -> "已取消";
+        });
+        row.put("deliveryStatus", switch (order.status) {
+            case PENDING_PAY -> "待发货";
+            case PAID -> "待发货";
+            case SHIPPED -> "配送中";
+            case COMPLETED -> "已完成";
+            case REFUND_REQUESTED -> "退款处理中";
+            case REFUNDED -> "已退款";
+            case CANCELLED -> "已取消";
+        });
+        return row;
     }
 
     public Map<String, Object> consult(String symptoms) {
@@ -711,17 +781,67 @@ public class ClinicService {
 
     public Map<String, Object> adminStats() {
         Map<String, Object> stats = new LinkedHashMap<>();
+        List<Appointment> appointmentRows = appointments.selectList(new QueryWrapper<Appointment>());
+        List<MedicineOrder> orderRows = orders.selectList(new QueryWrapper<MedicineOrder>());
+        List<MedicalRecord> recordRows = records.selectList(new QueryWrapper<MedicalRecord>());
         stats.put("users", users.selectCount(new QueryWrapper<UserAccount>()));
         stats.put("doctors", doctors.selectCount(new QueryWrapper<DoctorProfile>()));
-        stats.put("appointments", appointments.selectCount(new QueryWrapper<Appointment>()));
-        stats.put("orders", orders.selectCount(new QueryWrapper<MedicineOrder>()));
-        stats.put("records", records.selectCount(new QueryWrapper<MedicalRecord>()));
+        stats.put("appointments", appointmentRows.size());
+        stats.put("orders", orderRows.size());
+        stats.put("records", recordRows.size());
+        stats.put("activePatients", Stream.of(
+                appointmentRows.stream().map(row -> row.patientId),
+                orderRows.stream().map(row -> row.patientId),
+                recordRows.stream().map(row -> row.patientId))
+            .flatMap(s -> s)
+            .collect(Collectors.toCollection(LinkedHashSet::new))
+            .size());
+        stats.put("appointmentStatusCounts", appointmentRows.stream().collect(Collectors.groupingBy(
+            row -> row.status.name(), LinkedHashMap::new, Collectors.counting())));
+        stats.put("orderStatusCounts", orderRows.stream().collect(Collectors.groupingBy(
+            row -> row.status.name(), LinkedHashMap::new, Collectors.counting())));
+        stats.put("peakHours", appointmentRows.stream().collect(Collectors.groupingBy(
+            row -> row.timeSlot == null ? "未知" : String.format("%02d:00", row.timeSlot.getHour()),
+            LinkedHashMap::new,
+            Collectors.counting())));
+        stats.put("commonSymptoms", appointmentRows.stream()
+            .map(row -> Optional.ofNullable(row.symptoms).orElse("未填写"))
+            .collect(Collectors.groupingBy(text -> text, LinkedHashMap::new, Collectors.counting()))
+            .entrySet().stream()
+            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            .limit(6)
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new)));
         stats.put("medicineSales", orderItems.selectList(new QueryWrapper<OrderItem>()).stream()
             .collect(Collectors.groupingBy(item -> item.medicineName, LinkedHashMap::new, Collectors.summingInt(item -> item.quantity))));
-        stats.put("commonSymptoms", appointments.selectList(new QueryWrapper<Appointment>()).stream()
-            .map(row -> Optional.ofNullable(row.symptoms).orElse("未填写"))
-            .collect(Collectors.groupingBy(text -> text, LinkedHashMap::new, Collectors.counting())));
+        stats.put("doctorWorkload", doctors.selectList(new QueryWrapper<DoctorProfile>()).stream().map(doctor -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            long total = appointmentRows.stream().filter(item -> Objects.equals(item.doctorId, doctor.id)).count();
+            long completed = appointmentRows.stream().filter(item -> Objects.equals(item.doctorId, doctor.id) && item.status == AppointmentStatus.COMPLETED).count();
+            long noShow = appointmentRows.stream().filter(item -> Objects.equals(item.doctorId, doctor.id) && item.status == AppointmentStatus.NO_SHOW).count();
+            row.put("doctor", doctor);
+            row.put("appointmentCount", total);
+            row.put("completedCount", completed);
+            row.put("noShowCount", noShow);
+            return row;
+        }).sorted((left, right) -> Long.compare((Long) right.get("appointmentCount"), (Long) left.get("appointmentCount"))).limit(6).toList());
         return stats;
+    }
+
+    private String auditPrescription(List<PrescriptionItem> items) {
+        if (items == null || items.isEmpty()) {
+            return "未开药";
+        }
+        List<String> flags = new ArrayList<>();
+        if (items.size() > 3) {
+            flags.add("药品种类较多");
+        }
+        if (items.stream().anyMatch(item -> item.days != null && item.days > 14)) {
+            flags.add("用药天数较长");
+        }
+        if (items.stream().anyMatch(item -> item.frequency == null || item.frequency.isBlank())) {
+            flags.add("频次缺失");
+        }
+        return flags.isEmpty() ? "未发现明显异常" : String.join("，", flags);
     }
 
     public void reviewDoctor(Long doctorId, ReviewStatus status, String comment) {

@@ -25,8 +25,8 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public ApiResponse<List<UserAccount>> users() {
-        return ApiResponse.ok(clinicService.users().selectList(new QueryWrapper<UserAccount>().orderByDesc("created_at")));
+    public ApiResponse<List<Map<String, Object>>> users() {
+        return ApiResponse.ok(clinicService.adminUserViews());
     }
 
     @PostMapping("/users")
@@ -137,19 +137,21 @@ public class AdminController {
     }
 
     @GetMapping("/records")
-    public ApiResponse<List<MedicalRecord>> records() {
-        return ApiResponse.ok(clinicService.records().selectList(new QueryWrapper<MedicalRecord>().orderByDesc("created_at")));
+    public ApiResponse<List<Map<String, Object>>> records() {
+        return ApiResponse.ok(clinicService.records().selectList(new QueryWrapper<MedicalRecord>().orderByDesc("created_at"))
+            .stream().map(clinicService::recordWithPrescription).toList());
     }
 
     @GetMapping("/prescriptions")
-    public ApiResponse<List<Prescription>> prescriptions() {
-        return ApiResponse.ok(clinicService.prescriptions().selectList(new QueryWrapper<Prescription>().orderByDesc("created_at")));
+    public ApiResponse<List<Map<String, Object>>> prescriptions() {
+        return ApiResponse.ok(clinicService.prescriptions().selectList(new QueryWrapper<Prescription>().orderByDesc("created_at"))
+            .stream().map(clinicService::prescriptionWithItems).toList());
     }
 
     @GetMapping("/orders")
     public ApiResponse<List<Map<String, Object>>> orders() {
         return ApiResponse.ok(clinicService.orders().selectList(new QueryWrapper<MedicineOrder>().orderByDesc("created_at"))
-            .stream().map(clinicService::orderWithItems).toList());
+            .stream().map(clinicService::adminOrderView).toList());
     }
 
     @PutMapping("/orders/{id}/status")

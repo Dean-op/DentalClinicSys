@@ -35,12 +35,14 @@ public class AuthController {
         UserAccount account = clinicService.users().selectById(principal.id);
         account.lastLoginAt = LocalDateTime.now();
         clinicService.users().updateById(account);
+        clinicService.log("LOGIN_SUCCESS", account.username + " role=" + principal.role);
         return ApiResponse.ok(Map.of("token", jwtService.issue(principal), "user", clinicService.meOf(principal)));
     }
 
     @PostMapping("/register")
     public ApiResponse<Map<String, Object>> register(@Validated @RequestBody RegisterRequest request) {
         UserAccount account = clinicService.registerPatient(request.username(), request.password(), request.name(), request.phone());
+        clinicService.log("REGISTER_PATIENT", account.username);
         return ApiResponse.ok(Map.of("id", account.id, "username", account.username));
     }
 
