@@ -226,7 +226,19 @@
                 <el-alert v-if="consultResult" class="mt" type="warning" :closable="false" :title="consultResult.disclaimer" />
                 <div v-if="consultResult" class="result">
                   <div class="muted">模型：{{ consultResult.model }} · {{ consultResult.provider }}</div>
-                  <pre>{{ consultResult.answer }}</pre>
+                  <el-table :data="consultSectionRows" stripe class="mt">
+                    <el-table-column prop="title" label="项目" width="220" />
+                    <el-table-column label="内容">
+                      <template #default="{ row }">
+                        <div class="consult-section-content">{{ row.content || '-' }}</div>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                  <el-collapse class="mt" accordion>
+                    <el-collapse-item title="查看原始回答" name="raw">
+                      <pre>{{ consultResult.answer }}</pre>
+                    </el-collapse-item>
+                  </el-collapse>
                 </div>
 
                 <el-divider v-if="consultResult" content-position="left">症状匹配推荐</el-divider>
@@ -316,6 +328,41 @@ const consulting = ref(false)
 const appointmentForm = reactive({ doctorId: undefined as number | undefined, visitDate: '', timeSlot: '09:00', symptoms: '', demand: '' })
 
 const appointmentNotices = computed(() => messages.value.filter((item) => item.question?.startsWith('【预约通知】')).slice(0, 5))
+function formatConsultSectionContent(content: string) {
+  return content
+    .split(/\r?\n/)
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^[-*]\s+/, '• ')
+        .replace(/^\d+[.、]\s+/, '• ')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+    )
+    .filter((line) => line.length > 0)
+    .join('\n')
+}
+
+const consultSectionRows = computed(() => {
+  const rows = consultResult.value?.sections
+  if (Array.isArray(rows) && rows.length) {
+    const order = ['初步评估', '可能原因', '建议就诊科室或医生方向', '参考用药或护理建议', '何时尽快就医', '免责声明']
+    return [...rows].map((row: any) => ({
+      ...row,
+      content: formatConsultSectionContent(row.content || '')
+    })).sort((left: any, right: any) => {
+      const leftIndex = order.indexOf(left.title)
+      const rightIndex = order.indexOf(right.title)
+      if (leftIndex === -1 && rightIndex === -1) return 0
+      if (leftIndex === -1) return 1
+      if (rightIndex === -1) return -1
+      return leftIndex - rightIndex
+    })
+  }
+  if (consultResult.value?.answer) {
+    return [{ title: 'AI原文', content: formatConsultSectionContent(consultResult.value.answer) }]
+  }
+  return []
+})
 
 const appointmentStatusMap: Record<string, string> = {
   SUBMITTED: '待审核',
@@ -464,6 +511,10 @@ onMounted(loadAll)
   margin: 8px 0 0;
   white-space: pre-wrap;
   font-family: inherit;
+  line-height: 1.7;
+}
+.consult-section-content {
+  white-space: pre-wrap;
   line-height: 1.7;
 }
 .recommend-grid {

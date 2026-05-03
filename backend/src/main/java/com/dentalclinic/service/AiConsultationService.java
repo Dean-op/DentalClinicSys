@@ -15,9 +15,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -76,7 +80,8 @@ public class AiConsultationService {
             result.put("baseUrl", config.baseUrl);
             result.put("model", config.model);
             result.put("answer", content);
-            result.put("disclaimer", "AI suggestions are preliminary reference only and cannot replace a doctor's diagnosis.");
+            result.put("sections", extractSections(content));
+            result.put("disclaimer", "AI建议仅供就诊前参考，不能替代医生诊断。");
             result.put("usage", objectMapper.convertValue(root.path("usage"), Map.class));
             return result;
         } catch (BusinessException exception) {
@@ -123,17 +128,16 @@ public class AiConsultationService {
     private String systemPrompt() {
         return """
             You are an AI dental triage assistant in a dental clinic management system.
-            Answer in Simplified Chinese.
-            Provide only preliminary oral-health triage, possible causes, common care suggestions, recommended department, and visit advice.
+            Answer in Simplified Chinese only.
             Do not make a confirmed diagnosis, do not replace a licensed doctor, and do not promise treatment outcomes.
             If symptoms include severe pain, facial swelling, fever, persistent bleeding, trauma, swallowing difficulty, or breathing difficulty, advise urgent offline care.
-            Use this format:
-            1. Initial assessment
-            2. Possible causes
-            3. Recommended department or doctor direction
-            4. Reference medicine or care suggestions
-            5. When to seek care quickly
-            6. Disclaimer
+            Use Markdown and strictly follow this structure:
+            1. 初步评估
+            2. 可能原因
+            3. 建议就诊科室或医生方向
+            4. 参考用药或护理建议
+            5. 何时尽快就医
+            6. 免责声明
             """;
     }
 
@@ -161,6 +165,77 @@ public class AiConsultationService {
             toJson(medicines)
         );
     }
+
+    private List<Map<String, String>> extractSections(String content) {
+        if (!StringUtils.hasText(content)) {
+            return List.of();
+        }
+        List<SectionDefinition> definitions = List.of(
+            new SectionDefinition("初步评估", Set.of("初步评估", "Initial assessment")),
+            new SectionDefinition("可能原因", Set.of("可能原因", "Possible causes")),
+            new SectionDefinition("建议就诊科室或医生方向", Set.of("建议就诊科室或医生方向", "建议就诊科室", "推荐科室", "Recommended department or doctor direction")),
+            new SectionDefinition("参考用药或护理建议", Set.of("参考用药或护理建议", "参考用药建议", "护理建议", "Reference medicine or care suggestions")),
+            new SectionDefinition("何时尽快就医", Set.of("何时尽快就医", "When to seek care quickly")),
+            new SectionDefinition("免责声明", Set.of("免责声明", "Disclaimer"))
+        );
+
+        LinkedHashMap<String, StringBuilder> bucket = new LinkedHashMap<>();
+        String currentTitle = null;
+        for (String line : content.split("\\R")) {
+            String trimmed = line.trim();
+            if (!StringUtils.hasText(trimmed)) {
+                if (currentTitle != null) {
+                    bucket.get(currentTitle).append('\n');
+                }
+                continue;
+            }
+
+            SectionHit hit = detectSection(trimmed, definitions);
+            if (hit != null) {
+                currentTitle = hit.title();
+                bucket.putIfAbsent(currentTitle, new StringBuilder());
+                if (StringUtils.hasText(hit.remainder())) {
+                    bucket.get(currentTitle).append(hit.remainder().trim());
+                }
+                continue;
+            }
+
+            if (currentTitle == null) {
+                currentTitle = "AI原文";
+                bucket.putIfAbsent(currentTitle, new StringBuilder());
+            }
+            if (bucket.get(currentTitle).length() > 0) {
+                bucket.get(currentTitle).append('\n');
+            }
+            bucket.get(currentTitle).append(line);
+        }
+
+        List<Map<String, String>> sections = new ArrayList<>();
+        for (Map.Entry<String, StringBuilder> entry : bucket.entrySet()) {
+            Map<String, String> section = new LinkedHashMap<>();
+            section.put("title", entry.getKey());
+            section.put("content", entry.getValue().toString().trim());
+            sections.add(section);
+        }
+        return sections;
+    }
+
+    private SectionHit detectSection(String line, List<SectionDefinition> definitions) {
+        String normalized = line.replaceFirst("^#{1,6}\\s*", "").replaceFirst("^\\d+[.、]\\s*", "");
+        for (SectionDefinition definition : definitions) {
+            for (String alias : definition.aliases()) {
+                Pattern pattern = Pattern.compile("^" + Pattern.quote(alias) + "(?:\\s*[：:\\-—]\\s*(.*))?$");
+                var matcher = pattern.matcher(normalized);
+                if (matcher.matches()) {
+                    return new SectionHit(definition.title(), matcher.group(1) == null ? "" : matcher.group(1));
+                }
+            }
+        }
+        return null;
+    }
+
+    private record SectionDefinition(String title, Set<String> aliases) {}
+    private record SectionHit(String title, String remainder) {}
 
     private String toJson(Object value) {
         try {
