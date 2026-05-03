@@ -34,7 +34,7 @@ public class PatientController {
         profile.phone = request.phone;
         profile.address = request.address;
         profile.allergyHistory = request.allergyHistory;
-        clinicService.patients.updateById(profile);
+        clinicService.patients().updateById(profile);
         return ApiResponse.ok(profile);
     }
 
@@ -50,7 +50,7 @@ public class PatientController {
 
     @GetMapping("/doctors/{id}")
     public ApiResponse<Map<String, Object>> doctor(@PathVariable Long id) {
-        return ApiResponse.ok(clinicService.doctorCard(clinicService.doctors.selectById(id)));
+        return ApiResponse.ok(clinicService.doctorCard(clinicService.doctors().selectById(id)));
     }
 
     @GetMapping("/medicines")
@@ -70,7 +70,7 @@ public class PatientController {
 
     @DeleteMapping("/cart/{id}")
     public ApiResponse<Void> removeCart(@PathVariable Long id) {
-        clinicService.cartItems.deleteById(id);
+        clinicService.cartItems().deleteById(id);
         return ApiResponse.ok();
     }
 
@@ -144,14 +144,14 @@ public class PatientController {
         PatientProfile patient = clinicService.currentPatient();
         request.patientId = patient.id;
         request.createdAt = java.time.LocalDateTime.now();
-        clinicService.messages.insert(request);
+        clinicService.messages().insert(request);
         return ApiResponse.ok(request);
     }
 
     @GetMapping("/messages")
     public ApiResponse<List<Message>> messages() {
         PatientProfile patient = clinicService.currentPatient();
-        return ApiResponse.ok(clinicService.messages.selectList(
+        return ApiResponse.ok(clinicService.messages().selectList(
             new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Message>().eq("patient_id", patient.id).orderByDesc("created_at")
         ));
     }

@@ -20,25 +20,25 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class ClinicService {
-    public final UserAccountMapper users;
-    public final PatientProfileMapper patients;
-    public final DoctorProfileMapper doctors;
-    public final DoctorQualificationMapper qualifications;
-    public final DoctorScheduleMapper schedules;
-    public final AnnouncementMapper announcements;
-    public final MedicineMapper medicines;
-    public final CartItemMapper cartItems;
-    public final MedicineOrderMapper orders;
-    public final OrderItemMapper orderItems;
-    public final AppointmentMapper appointments;
-    public final MedicalRecordMapper records;
-    public final PrescriptionMapper prescriptions;
-    public final PrescriptionItemMapper prescriptionItems;
-    public final MessageMapper messages;
-    public final DoctorReviewMapper reviews;
-    public final SymptomRuleMapper symptomRules;
-    public final MedicationReminderMapper reminders;
-    public final OperationLogMapper logs;
+    private final UserAccountMapper users;
+    private final PatientProfileMapper patients;
+    private final DoctorProfileMapper doctors;
+    private final DoctorQualificationMapper qualifications;
+    private final DoctorScheduleMapper schedules;
+    private final AnnouncementMapper announcements;
+    private final MedicineMapper medicines;
+    private final CartItemMapper cartItems;
+    private final MedicineOrderMapper orders;
+    private final OrderItemMapper orderItems;
+    private final AppointmentMapper appointments;
+    private final MedicalRecordMapper records;
+    private final PrescriptionMapper prescriptions;
+    private final PrescriptionItemMapper prescriptionItems;
+    private final MessageMapper messages;
+    private final DoctorReviewMapper reviews;
+    private final SymptomRuleMapper symptomRules;
+    private final MedicationReminderMapper reminders;
+    private final OperationLogMapper logs;
     private final PasswordEncoder passwordEncoder;
 
     public ClinicService(UserAccountMapper users, PatientProfileMapper patients, DoctorProfileMapper doctors,
@@ -70,6 +70,62 @@ public class ClinicService {
         this.reminders = reminders;
         this.logs = logs;
         this.passwordEncoder = passwordEncoder;
+    }
+
+    public UserAccountMapper users() {
+        return users;
+    }
+
+    public PatientProfileMapper patients() {
+        return patients;
+    }
+
+    public DoctorProfileMapper doctors() {
+        return doctors;
+    }
+
+    public DoctorQualificationMapper qualifications() {
+        return qualifications;
+    }
+
+    public DoctorScheduleMapper schedules() {
+        return schedules;
+    }
+
+    public AnnouncementMapper announcements() {
+        return announcements;
+    }
+
+    public MedicineMapper medicines() {
+        return medicines;
+    }
+
+    public CartItemMapper cartItems() {
+        return cartItems;
+    }
+
+    public MedicineOrderMapper orders() {
+        return orders;
+    }
+
+    public AppointmentMapper appointments() {
+        return appointments;
+    }
+
+    public MedicalRecordMapper records() {
+        return records;
+    }
+
+    public PrescriptionMapper prescriptions() {
+        return prescriptions;
+    }
+
+    public MessageMapper messages() {
+        return messages;
+    }
+
+    public OperationLogMapper logs() {
+        return logs;
     }
 
     @Transactional

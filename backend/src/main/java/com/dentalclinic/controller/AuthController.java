@@ -32,9 +32,9 @@ public class AuthController {
             new UsernamePasswordAuthenticationToken(request.username(), request.password())
         );
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-        UserAccount account = clinicService.users.selectById(principal.id);
+        UserAccount account = clinicService.users().selectById(principal.id);
         account.lastLoginAt = LocalDateTime.now();
-        clinicService.users.updateById(account);
+        clinicService.users().updateById(account);
         return ApiResponse.ok(Map.of("token", jwtService.issue(principal), "user", clinicService.meOf(principal)));
     }
 
