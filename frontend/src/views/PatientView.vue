@@ -4,7 +4,7 @@
       <div class="nav-container">
         <div class="nav-brand">
           <el-icon class="brand-icon"><Avatar /></el-icon>
-          <span class="brand-text">SmileCare <span class="brand-sub">患者中心</span></span>
+          <span class="brand-text">口腔诊所系统 <span class="brand-sub">患者中心</span></span>
         </div>
         <div class="user-menu">
           <el-popover placement="bottom-end" :width="320" trigger="click">
@@ -30,7 +30,7 @@
             </div>
           </el-popover>
           <div class="user-greeting">欢迎，{{ auth.user?.profile?.name || auth.user?.username }}</div>
-          <el-button plain round icon="SwitchButton" size="small" @click="logout">退出登录</el-button>
+          <el-button plain round size="small" class="logout-btn" @click="logout">退出登录</el-button>
         </div>
       </div>
     </header>

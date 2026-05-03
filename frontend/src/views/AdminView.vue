@@ -4,7 +4,7 @@
       <div class="sidebar-header">
         <div class="logo-box"><el-icon><Monitor /></el-icon></div>
         <div class="brand-info">
-          <span class="brand-text">SmileAdmin</span>
+          <span class="brand-text">口腔诊所管理系统</span>
           <span class="brand-sub">OS Control Panel</span>
         </div>
       </div>
@@ -31,7 +31,7 @@
             <div class="admin-role">System Admin</div>
           </div>
         </div>
-        <el-button link class="logout-btn" @click="logout"><el-icon><SwitchButton /></el-icon></el-button>
+        <el-button link class="logout-btn" @click="logout">退出登录</el-button>
       </div>
     </aside>
 

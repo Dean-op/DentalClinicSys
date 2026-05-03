@@ -3,7 +3,7 @@
     <aside class="doctor-sidebar">
       <div class="sidebar-header">
         <el-icon class="brand-icon"><FirstAidKit /></el-icon>
-        <span class="brand-text">SmileCare</span>
+        <span class="brand-text">口腔诊所管理系统</span>
         <el-tag size="small" effect="dark" round color="rgba(255,255,255,0.2)" class="role-tag">医生端</el-tag>
       </div>
       
@@ -28,7 +28,7 @@
             <div class="doc-title">{{ profile?.department || '未分配科室' }}</div>
           </div>
         </div>
-        <el-button link class="logout-btn" @click="logout"><el-icon><SwitchButton /></el-icon></el-button>
+        <el-button link class="logout-btn" @click="logout">退出登录</el-button>
       </div>
     </aside>
 

@@ -7,36 +7,33 @@
       <el-tabs v-model="mode" stretch>
         <el-tab-pane label="登录" name="login">
           <el-form :model="loginForm" label-position="top" @keyup.enter="handleLogin">
-            <el-form-item label="预制账号">
-              <el-select
-                v-model="selectedPreset"
-                placeholder="选择演示账号"
-                filterable
-                style="width: 100%"
-                @change="applyPreset"
-              >
-                <el-option
-                  v-for="account in presetAccounts"
-                  :key="account.username"
-                  :label="`${account.label}：${account.username} / ${account.password}`"
-                  :value="account.username"
-                >
-                  <div class="preset-option">
-                    <span>{{ account.label }}</span>
-                    <code>{{ account.username }} / {{ account.password }}</code>
-                  </div>
-                </el-option>
-              </el-select>
-            </el-form-item>
             <el-form-item label="账号">
-              <el-input v-model="loginForm.username" prefix-icon="User" />
+              <el-input v-model="loginForm.username" prefix-icon="User" size="large" />
             </el-form-item>
             <el-form-item label="密码">
-              <el-input v-model="loginForm.password" prefix-icon="Lock" show-password />
+              <el-input v-model="loginForm.password" prefix-icon="Lock" show-password size="large" />
             </el-form-item>
-            <el-button type="primary" :loading="loading" class="full" @click="handleLogin">
-              登录系统
+            <el-button type="primary" :loading="loading" class="full login-btn" size="large" @click="handleLogin">
+              登 录
             </el-button>
+            <div class="demo-tools">
+              <el-dropdown trigger="click" @command="applyPreset">
+                <span class="demo-link">
+                  <el-icon><MagicStick /></el-icon> 演示账号体验
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item 
+                      v-for="account in presetAccounts" 
+                      :key="account.username" 
+                      :command="account.username"
+                    >
+                      {{ account.label }} ({{ account.username }})
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </el-form>
         </el-tab-pane>
 
@@ -75,7 +72,6 @@ const router = useRouter()
 const auth = useAuthStore()
 const mode = ref('login')
 const loading = ref(false)
-const selectedPreset = ref('patient_li')
 
 const loginForm = reactive({ username: 'patient_li', password: '123456' })
 const registerForm = reactive({ username: '', password: '', name: '', phone: '' })
@@ -126,15 +122,29 @@ async function handleRegister() {
   width: 100%;
 }
 
-.preset-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.login-btn {
+  margin-top: 8px;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 2px;
 }
 
-.preset-option code {
-  color: #557178;
-  font-size: 12px;
+.demo-tools {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.demo-link {
+  font-size: 13px;
+  color: #94a3b8;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s;
+}
+
+.demo-link:hover {
+  color: #3b82f6;
 }
 </style>
