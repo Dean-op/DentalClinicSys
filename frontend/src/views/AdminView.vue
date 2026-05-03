@@ -1,35 +1,84 @@
 <template>
-  <div class="shell theme-admin">
-    <aside class="sidebar">
-      <div class="brand">Dental Clinic</div>
-      <div class="role-pill"><el-icon><Setting /></el-icon> 管理员端</div>
-      <el-menu :default-active="activeTab" background-color="#113c49" text-color="#d9eff2" active-text-color="#ffffff" @select="activeTab = $event">
-        <el-menu-item v-for="item in tabs" :key="item.name" :index="item.name">
+  <div class="admin-layout theme-admin">
+    <aside class="admin-sidebar">
+      <div class="sidebar-header">
+        <div class="logo-box"><el-icon><Monitor /></el-icon></div>
+        <div class="brand-info">
+          <span class="brand-text">SmileAdmin</span>
+          <span class="brand-sub">OS Control Panel</span>
+        </div>
+      </div>
+      
+      <div class="sidebar-menu">
+        <div 
+          v-for="item in tabs" 
+          :key="item.name"
+          class="menu-item"
+          :class="{ active: activeTab === item.name }"
+          @click="activeTab = item.name"
+        >
+          <div class="active-indicator" v-if="activeTab === item.name"></div>
           <el-icon><component :is="item.icon" /></el-icon>
           <span>{{ item.label }}</span>
-        </el-menu-item>
-      </el-menu>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="admin-info">
+          <el-avatar size="small" icon="UserFilled" class="admin-avatar" />
+          <div class="admin-text">
+            <div class="admin-name">Administrator</div>
+            <div class="admin-role">System Admin</div>
+          </div>
+        </div>
+        <el-button link class="logout-btn" @click="logout"><el-icon><SwitchButton /></el-icon></el-button>
+      </div>
     </aside>
 
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <div class="page-title">后台管理系统</div>
-          <div class="muted">全角色、全模块统一管理</div>
+    <main class="admin-main">
+      <header class="admin-header">
+        <div class="header-left">
+          <h2 class="current-title">{{ currentTabLabel }}</h2>
+          <el-tag effect="dark" round color="#1e293b" style="border:none">全模块统一管理中心</el-tag>
         </div>
-        <el-button icon="SwitchButton" @click="logout">退出</el-button>
+        <div class="header-right">
+          <div class="time-display"><el-icon><Clock /></el-icon> {{ currentTime }}</div>
+        </div>
       </header>
 
-      <section class="panel">
-        <el-tabs v-model="activeTab">
+      <div class="admin-content">
+        <div class="content-wrapper">
+          <el-tabs v-model="activeTab" class="hidden-header-tabs">
           <el-tab-pane label="统计分析" name="stats">
-            <div class="metric-grid">
-              <div class="metric"><strong>{{ stats.users || 0 }}</strong><span>账户数</span></div>
-              <div class="metric"><strong>{{ stats.doctors || 0 }}</strong><span>医生数</span></div>
-              <div class="metric"><strong>{{ stats.activePatients || 0 }}</strong><span>活跃患者</span></div>
-              <div class="metric"><strong>{{ stats.appointments || 0 }}</strong><span>预约量</span></div>
-              <div class="metric"><strong>{{ stats.orders || 0 }}</strong><span>订单量</span></div>
-              <div class="metric"><strong>{{ stats.records || 0 }}</strong><span>病例数</span></div>
+            <div class="dashboard-header">
+              <div class="dash-title">核心数据监控墙</div>
+              <div class="live-pulse"><span class="pulse-dot"></span> LIVE DATA</div>
+            </div>
+            <div class="metric-grid modern-metrics">
+              <div class="metric-card">
+                <div class="m-icon users-icon"><el-icon><User /></el-icon></div>
+                <div class="m-info"><span>账户总数</span><strong>{{ stats.users || 0 }}</strong></div>
+              </div>
+              <div class="metric-card">
+                <div class="m-icon docs-icon"><el-icon><FirstAidKit /></el-icon></div>
+                <div class="m-info"><span>入驻医生</span><strong>{{ stats.doctors || 0 }}</strong></div>
+              </div>
+              <div class="metric-card">
+                <div class="m-icon pat-icon"><el-icon><Avatar /></el-icon></div>
+                <div class="m-info"><span>活跃患者</span><strong>{{ stats.activePatients || 0 }}</strong></div>
+              </div>
+              <div class="metric-card">
+                <div class="m-icon apt-icon"><el-icon><Calendar /></el-icon></div>
+                <div class="m-info"><span>预约总量</span><strong>{{ stats.appointments || 0 }}</strong></div>
+              </div>
+              <div class="metric-card">
+                <div class="m-icon order-icon"><el-icon><ShoppingCart /></el-icon></div>
+                <div class="m-info"><span>订单总量</span><strong>{{ stats.orders || 0 }}</strong></div>
+              </div>
+              <div class="metric-card">
+                <div class="m-icon record-icon"><el-icon><Document /></el-icon></div>
+                <div class="m-info"><span>病历档案</span><strong>{{ stats.records || 0 }}</strong></div>
+              </div>
             </div>
 
             <el-row :gutter="16" class="mt">
@@ -353,7 +402,8 @@
             </el-table>
           </el-tab-pane>
         </el-tabs>
-      </section>
+        </div>
+      </div>
     </main>
   </div>
 </template>
@@ -380,6 +430,12 @@ const tabs = [
   { name: 'appointments', label: '预约管理', icon: 'Calendar' },
   { name: 'logs', label: '系统日志', icon: 'Files' }
 ]
+
+const currentTabLabel = computed(() => tabs.find(t => t.name === activeTab.value)?.label || '')
+const currentTime = ref(new Date().toLocaleString('zh-CN', { hour12: false }))
+setInterval(() => {
+  currentTime.value = new Date().toLocaleString('zh-CN', { hour12: false })
+}, 1000)
 
 const stats = ref<any>({})
 const users = ref<any[]>([])
@@ -593,20 +649,326 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
+/* Admin Layout Variables */
+.admin-layout {
+  display: flex;
+  height: 100vh;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+
+.admin-sidebar {
+  width: 260px;
+  background: #0f172a;
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 10;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.1);
+}
+.sidebar-header {
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-box {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.brand-info {
+  display: flex;
+  flex-direction: column;
+}
+.brand-info .brand-text {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+.brand-info .brand-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.sidebar-menu {
+  flex: 1;
+  padding: 16px 12px;
+  overflow-y: auto;
+}
+.sidebar-menu::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-menu::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #cbd5e1;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  margin-bottom: 6px;
+  position: relative;
+}
+.menu-item:hover {
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+}
+.menu-item.active {
+  background: #1e293b;
+  color: #fff;
+  font-weight: 600;
+}
+.active-indicator {
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: #3b82f6;
+  border-radius: 0 4px 4px 0;
+}
+.menu-item .el-icon {
+  font-size: 18px;
+  color: #64748b;
+  transition: color 0.2s;
+}
+.menu-item.active .el-icon {
+  color: #3b82f6;
+}
+.sidebar-footer {
+  padding: 16px;
+  background: #0b1120;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.admin-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.admin-avatar {
+  background: #1e293b;
+  color: #94a3b8;
+}
+.admin-text {
+  display: flex;
+  flex-direction: column;
+}
+.admin-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+.admin-role {
+  font-size: 11px;
+  color: #64748b;
+}
+.logout-btn {
+  color: #64748b;
+}
+.logout-btn:hover {
+  color: #ef4444;
+}
+
+.admin-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+}
+.admin-header {
+  height: 70px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  z-index: 5;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.current-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.time-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: monospace;
+  font-size: 14px;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+.admin-content {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-y: auto;
+}
+.content-wrapper {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+  min-height: calc(100vh - 118px);
+}
+:deep(.hidden-header-tabs > .el-tabs__header) {
+  display: none !important;
+}
+
+/* Dashboard Specifics */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.dash-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  position: relative;
+  padding-left: 12px;
+}
+.dash-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 18px;
+  background: #3b82f6;
+  border-radius: 2px;
+}
+.live-pulse {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #10b981;
+  letter-spacing: 1px;
+}
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.modern-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.metric-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+  border-color: #cbd5e1;
+}
+.m-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+.users-icon { background: #eff6ff; color: #3b82f6; }
+.docs-icon { background: #ecfdf5; color: #10b981; }
+.pat-icon { background: #fef2f2; color: #ef4444; }
+.apt-icon { background: #fffbeb; color: #f59e0b; }
+.order-icon { background: #f5f3ff; color: #8b5cf6; }
+.record-icon { background: #f0fdfa; color: #14b8a6; }
+
+.m-info {
+  display: flex;
+  flex-direction: column;
+}
+.m-info span {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+.m-info strong {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1;
+}
+.stat-card {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+.stat-card :deep(.el-card__header) {
+  font-weight: 600;
+  color: #334155;
+  background: #f8fafc;
+  padding: 12px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
 .narrow-form {
   max-width: 760px;
   margin-bottom: 18px;
 }
-
 .mt {
   margin-top: 12px;
 }
-
-.stat-card {
-  border: 1px solid #dfe9eb;
-  border-radius: 8px;
-}
-
 .expand-box {
   padding: 8px 4px;
 }
