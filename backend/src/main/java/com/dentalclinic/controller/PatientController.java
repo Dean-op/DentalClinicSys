@@ -139,6 +139,11 @@ public class PatientController {
         return ApiResponse.ok(clinicService.myReminders());
     }
 
+    @GetMapping("/reminders/alerts")
+    public ApiResponse<List<Map<String, Object>>> reminderAlerts() {
+        return ApiResponse.ok(clinicService.myReminderAlerts());
+    }
+
     @PostMapping("/messages")
     public ApiResponse<Message> createMessage(@RequestBody Message request) {
         PatientProfile patient = clinicService.currentPatient();

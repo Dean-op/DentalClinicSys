@@ -442,7 +442,35 @@ public class ClinicService {
 
     public List<MedicationReminder> myReminders() {
         PatientProfile patient = currentPatient();
-        return reminders.selectList(new QueryWrapper<MedicationReminder>().eq("patient_id", patient.id).orderByAsc("expected_run_out_date"));
+        List<MedicationReminder> rows = reminders.selectList(new QueryWrapper<MedicationReminder>()
+            .eq("patient_id", patient.id)
+            .orderByAsc("expected_run_out_date"));
+        LocalDate warnDate = LocalDate.now().plusDays(3);
+        for (MedicationReminder reminder : rows) {
+            if (Boolean.FALSE.equals(reminder.warned) && !reminder.expectedRunOutDate.isAfter(warnDate)) {
+                reminder.warned = true;
+                reminders.updateById(reminder);
+            }
+        }
+        return rows;
+    }
+
+    public List<Map<String, Object>> myReminderAlerts() {
+        return myReminders().stream()
+            .filter(reminder -> Boolean.TRUE.equals(reminder.warned))
+            .map(reminder -> {
+                Medicine medicine = medicines.selectById(reminder.medicineId);
+                long daysLeft = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), reminder.expectedRunOutDate);
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("reminder", reminder);
+                row.put("medicine", medicine);
+                row.put("daysLeft", daysLeft);
+                row.put("message", daysLeft < 0
+                    ? reminder.medicineName + " 已预计用完，建议及时复诊或购药。"
+                    : reminder.medicineName + " 预计 " + daysLeft + " 天后用完，建议及时补充。");
+                return row;
+            })
+            .toList();
     }
 
     public List<Map<String, Object>> doctorAppointments(LocalDate date) {

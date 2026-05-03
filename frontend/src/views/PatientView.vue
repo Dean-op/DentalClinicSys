@@ -123,14 +123,66 @@
             <el-row :gutter="16">
               <el-col :md="12" :xs="24">
                 <el-input v-model="symptomInput" type="textarea" :rows="5" placeholder="请输入牙痛、牙龈出血、口臭等症状" />
-                <el-button type="primary" icon="MagicStick" style="margin-top: 10px" @click="consult">AI牙医初评</el-button>
+                <div class="toolbar mt">
+                  <el-button type="primary" icon="MagicStick" :loading="consulting" @click="consult">AI牙医初评</el-button>
+                  <el-button icon="Refresh" @click="loadAll">刷新推荐与提醒</el-button>
+                </div>
                 <el-alert v-if="consultResult" class="mt" type="warning" :closable="false" :title="consultResult.disclaimer" />
                 <div v-if="consultResult" class="result">
                   <div class="muted">模型：{{ consultResult.model }} · {{ consultResult.provider }}</div>
                   <pre>{{ consultResult.answer }}</pre>
                 </div>
+
+                <el-divider v-if="consultResult" content-position="left">症状匹配推荐</el-divider>
+                <div v-if="consultResult" class="recommend-grid">
+                  <div class="recommend-box">
+                    <h3>推荐科室</h3>
+                    <el-tag v-for="dept in consultResult.recommendedDepartments" :key="dept" effect="plain">
+                      {{ dept }}
+                    </el-tag>
+                  </div>
+                  <div class="recommend-box">
+                    <h3>推荐医生</h3>
+                    <el-table :data="consultResult.recommendedDoctors || []" size="small">
+                      <el-table-column prop="name" label="医生" width="90" />
+                      <el-table-column prop="department" label="科室" />
+                      <el-table-column label="操作" width="90">
+                        <template #default="{ row }">
+                          <el-button type="primary" link @click="selectDoctor(row.id)">预约</el-button>
+                        </template>
+                      </el-table-column>
+                    </el-table>
+                  </div>
+                  <div class="recommend-box">
+                    <h3>推荐药品</h3>
+                    <el-table :data="consultResult.recommendedMedicines || []" size="small">
+                      <el-table-column prop="name" label="药品" />
+                      <el-table-column prop="price" label="价格" width="80" />
+                      <el-table-column label="操作" width="90">
+                        <template #default="{ row }">
+                          <el-button type="success" link @click="quickBuy(row)">购买</el-button>
+                        </template>
+                      </el-table-column>
+                    </el-table>
+                  </div>
+                </div>
               </el-col>
               <el-col :md="12" :xs="24">
+                <el-divider content-position="left">AI用药预警</el-divider>
+                <el-alert
+                  v-for="alert in reminderAlerts"
+                  :key="alert.reminder.id"
+                  class="mt"
+                  type="error"
+                  :closable="false"
+                  :title="alert.message"
+                >
+                  <template #default>
+                    <el-button size="small" type="primary" @click="quickBuy(alert.medicine)">立即购药</el-button>
+                  </template>
+                </el-alert>
+                <el-empty v-if="!reminderAlerts.length" description="暂无即将用完的药品" :image-size="70" />
+
                 <el-divider content-position="left">既往病例</el-divider>
                 <el-table :data="records" stripe>
                   <el-table-column prop="diagnosis" label="诊断" />
@@ -141,6 +193,16 @@
                 <el-table :data="reminders" stripe>
                   <el-table-column prop="medicineName" label="药品" />
                   <el-table-column prop="expectedRunOutDate" label="预计用完" />
+                  <el-table-column label="状态" width="90">
+                    <template #default="{ row }">
+                      <el-tag :type="row.warned ? 'danger' : 'success'">{{ row.warned ? '预警' : '正常' }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="90">
+                    <template #default="{ row }">
+                      <el-button type="primary" link @click="buyReminder(row)">购药</el-button>
+                    </template>
+                  </el-table-column>
                 </el-table>
               </el-col>
             </el-row>
@@ -178,9 +240,11 @@ const orders = ref<any[]>([])
 const appointments = ref<any[]>([])
 const records = ref<any[]>([])
 const reminders = ref<any[]>([])
+const reminderAlerts = ref<any[]>([])
 const deliveryMethod = ref('到店自取')
 const symptomInput = ref('')
 const consultResult = ref<any>(null)
+const consulting = ref(false)
 const appointmentForm = reactive({ doctorId: undefined as number | undefined, visitDate: '', timeSlot: '09:00', symptoms: '', demand: '' })
 
 async function loadAll() {
@@ -191,6 +255,7 @@ async function loadAll() {
   appointments.value = await apiGet('/patient/appointments')
   records.value = await apiGet('/patient/records')
   reminders.value = await apiGet('/patient/reminders')
+  reminderAlerts.value = await apiGet('/patient/reminders/alerts')
 }
 
 function selectDoctor(id: number) {
@@ -206,6 +271,23 @@ async function submitOrder() {
   })
   ElMessage.success('下单成功')
   await loadAll()
+}
+
+async function quickBuy(medicine: any) {
+  if (!medicine?.id) return ElMessage.warning('药品信息不完整')
+  await apiPost('/patient/orders', {
+    deliveryMethod: deliveryMethod.value,
+    items: [{ medicineId: medicine.id, quantity: 1 }]
+  })
+  ElMessage.success(`已购买 ${medicine.name}`)
+  activeTab.value = 'orders'
+  await loadAll()
+}
+
+async function buyReminder(reminder: any) {
+  const medicine = medicines.value.find((item) => item.id === reminder.medicineId)
+  if (medicine) return quickBuy(medicine)
+  return quickBuy({ id: reminder.medicineId, name: reminder.medicineName })
 }
 
 async function createAppointment() {
@@ -228,7 +310,13 @@ async function cancelAppointment(id: number) {
 }
 
 async function consult() {
-  consultResult.value = await apiPost('/patient/ai/consult', { symptoms: symptomInput.value })
+  consulting.value = true
+  try {
+    consultResult.value = await apiPost('/patient/ai/consult', { symptoms: symptomInput.value })
+    ElMessage.success('AI问诊建议已生成')
+  } finally {
+    consulting.value = false
+  }
 }
 
 function logout() {
@@ -260,5 +348,22 @@ onMounted(loadAll)
   white-space: pre-wrap;
   font-family: inherit;
   line-height: 1.7;
+}
+
+.recommend-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.recommend-box {
+  border: 1px solid #dfe9eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.recommend-box h3 {
+  font-size: 15px;
+  margin: 0 0 10px;
 }
 </style>
