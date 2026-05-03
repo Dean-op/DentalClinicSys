@@ -1,27 +1,49 @@
 <template>
-  <div class="shell">
-    <aside class="sidebar">
-      <div class="brand">Dental Clinic</div>
-      <div class="role-pill"><el-icon><User /></el-icon> 患者端</div>
-      <el-menu :default-active="activeTab" background-color="#113c49" text-color="#d9eff2" active-text-color="#ffffff" @select="activeTab = $event">
-        <el-menu-item v-for="item in tabs" :key="item.name" :index="item.name">
-          <el-icon><component :is="item.icon" /></el-icon>
-          <span>{{ item.label }}</span>
-        </el-menu-item>
-      </el-menu>
-    </aside>
-
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <div class="page-title">患者工作台</div>
-          <div class="muted">欢迎，{{ auth.user?.profile?.name || auth.user?.username }}</div>
+  <div class="patient-layout">
+    <header class="top-nav">
+      <div class="nav-container">
+        <div class="nav-brand">
+          <el-icon class="brand-icon"><Avatar /></el-icon>
+          <span class="brand-text">SmileCare <span class="brand-sub">患者中心</span></span>
         </div>
-        <el-button icon="SwitchButton" @click="logout">退出</el-button>
-      </header>
+        <div class="user-menu">
+          <div class="user-greeting">欢迎，{{ auth.user?.profile?.name || auth.user?.username }}</div>
+          <el-button plain round icon="SwitchButton" size="small" @click="logout">退出登录</el-button>
+        </div>
+      </div>
+    </header>
 
-      <section class="panel">
-        <el-tabs v-model="activeTab">
+    <div class="hero-section">
+      <div class="hero-container">
+        <h1>您的专属数字口腔管家</h1>
+        <p>一站式预约挂号、就诊历史、药品购买与 AI 问诊评估</p>
+      </div>
+    </div>
+
+    <main class="main-container">
+      <div class="layout-grid">
+        <aside class="side-nav">
+          <div class="nav-title">服务菜单</div>
+          <div class="nav-list">
+            <div 
+              v-for="item in tabs" 
+              :key="item.name" 
+              class="nav-item" 
+              :class="{ active: activeTab === item.name }"
+              @click="activeTab = item.name"
+            >
+              <el-icon><component :is="item.icon" /></el-icon>
+              <span>{{ item.label }}</span>
+            </div>
+          </div>
+        </aside>
+
+        <section class="content-panel">
+          <div class="panel-header">
+            <h2>{{ currentTabLabel }}</h2>
+          </div>
+          <div class="panel-body">
+            <el-tabs v-model="activeTab" class="hidden-header-tabs">
           <el-tab-pane label="公告浏览" name="announcements">
             <el-table :data="announcements" stripe>
               <el-table-column prop="category" label="类型" width="120" />
@@ -285,7 +307,9 @@
             </el-row>
           </el-tab-pane>
         </el-tabs>
-      </section>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
 </template>
@@ -310,6 +334,8 @@ const tabs = [
   { name: 'records', label: '病例查看', icon: 'Document' },
   { name: 'ai', label: 'AI牙医', icon: 'MagicStick' }
 ]
+
+const currentTabLabel = computed(() => tabs.find(t => t.name === activeTab.value)?.label || '')
 
 const announcements = ref<any[]>([])
 const doctors = ref<any[]>([])
@@ -493,6 +519,180 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
+.patient-layout {
+  min-height: 100vh;
+  background: #f4f9f9;
+  display: flex;
+  flex-direction: column;
+}
+
+.top-nav {
+  background: #ffffff;
+  height: 64px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.brand-icon {
+  font-size: 24px;
+  color: #0d9488;
+}
+
+.brand-sub {
+  font-size: 12px;
+  background: #ccfbf1;
+  color: #0f766e;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-greeting {
+  font-size: 14px;
+  color: #475569;
+}
+
+.hero-section {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: #ffffff;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.hero-container h1 {
+  margin: 0 0 12px;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.hero-container p {
+  margin: 0;
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.main-container {
+  max-width: 1200px;
+  margin: -32px auto 40px;
+  padding: 0 24px;
+  flex: 1;
+  width: 100%;
+}
+
+.layout-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.side-nav {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.06);
+  padding: 20px 12px;
+}
+
+.nav-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  padding: 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #475569;
+  font-size: 15px;
+  transition: all 0.2s ease;
+  margin-bottom: 4px;
+}
+
+.nav-item:hover {
+  background: #f1f5f9;
+  color: #0f766e;
+}
+
+.nav-item.active {
+  background: #f0fdfa;
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.content-panel {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.06);
+  min-height: 500px;
+}
+
+.panel-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.panel-body {
+  padding: 24px;
+}
+
+:deep(.hidden-header-tabs > .el-tabs__header) {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .layout-grid {
+    grid-template-columns: 1fr;
+  }
+  .main-container {
+    margin-top: 24px;
+  }
+}
+
 .narrow-form {
   max-width: 620px;
 }

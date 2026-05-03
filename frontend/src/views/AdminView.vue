@@ -1,5 +1,5 @@
 <template>
-  <div class="shell">
+  <div class="shell theme-admin">
     <aside class="sidebar">
       <div class="brand">Dental Clinic</div>
       <div class="role-pill"><el-icon><Setting /></el-icon> 管理员端</div>

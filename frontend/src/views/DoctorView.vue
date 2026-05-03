@@ -1,5 +1,5 @@
 <template>
-  <div class="shell">
+  <div class="shell theme-doctor">
     <aside class="sidebar">
       <div class="brand">Dental Clinic</div>
       <div class="role-pill"><el-icon><FirstAidKit /></el-icon> 医生端</div>
