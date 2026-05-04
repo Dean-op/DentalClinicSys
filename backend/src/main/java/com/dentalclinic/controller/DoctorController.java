@@ -27,6 +27,11 @@ public class DoctorController {
         return ApiResponse.ok(clinicService.currentDoctor(false));
     }
 
+    @GetMapping("/announcements")
+    public ApiResponse<List<Announcement>> announcements() {
+        return ApiResponse.ok(clinicService.doctorAnnouncements());
+    }
+
     @PutMapping("/profile")
     public ApiResponse<DoctorProfile> saveProfile(@RequestBody DoctorProfile request) {
         DoctorProfile profile = clinicService.currentDoctor(false);
@@ -80,6 +85,22 @@ public class DoctorController {
     @PostMapping("/records")
     public ApiResponse<MedicalRecord> saveRecord(@RequestBody MedicalRecord record) {
         return ApiResponse.ok(clinicService.saveRecord(record));
+    }
+
+    @GetMapping("/records")
+    public ApiResponse<List<Map<String, Object>>> records(@RequestParam(required = false) Long patientId,
+                                                          @RequestParam(required = false) String dateFrom,
+                                                          @RequestParam(required = false) String dateTo) {
+        return ApiResponse.ok(clinicService.myDoctorRecordViews(
+            patientId,
+            dateFrom == null ? null : LocalDate.parse(dateFrom),
+            dateTo == null ? null : LocalDate.parse(dateTo)
+        ));
+    }
+
+    @GetMapping("/records/{id}")
+    public ApiResponse<Map<String, Object>> recordDetail(@PathVariable Long id) {
+        return ApiResponse.ok(clinicService.myDoctorRecordDetail(id));
     }
 
     @GetMapping("/patients/{patientId}/records")

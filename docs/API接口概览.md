@@ -52,6 +52,7 @@ Authorization: Bearer <token>
 ## 医生端
 
 - `GET /api/doctor/profile`
+- `GET /api/doctor/announcements`
 - `PUT /api/doctor/profile`
 - `GET /api/doctor/schedules`
 - `POST /api/doctor/schedules`
@@ -60,6 +61,8 @@ Authorization: Bearer <token>
 - `GET /api/doctor/appointments`
 - `PUT /api/doctor/appointments/{id}`
 - `POST /api/doctor/records`
+- `GET /api/doctor/records`
+- `GET /api/doctor/records/{id}`
 - `GET /api/doctor/patients/{patientId}/records`
 - `POST /api/doctor/prescriptions`
 - `GET /api/doctor/medicines`
@@ -76,6 +79,10 @@ Authorization: Bearer <token>
 - `GET /api/admin/doctors`
 - `PUT /api/admin/doctors/{id}/review`
 - `GET /api/admin/qualifications`
+- `GET /api/admin/schedules`
+- `POST /api/admin/schedules`
+- `PUT /api/admin/schedules/{id}`
+- `DELETE /api/admin/schedules/{id}`
 - `GET /api/admin/medicines`
 - `POST /api/admin/medicines`
 - `PUT /api/admin/medicines/{id}`

@@ -215,6 +215,65 @@
             </el-table>
           </el-tab-pane>
 
+          <el-tab-pane label="排班管理" name="schedules">
+            <el-alert type="info" :closable="false" title="管理员可以统一维护未来排班；已被预约的排班仅支持查看，不允许修改时间或删除。" />
+            <div class="toolbar mt">
+              <el-select v-model="scheduleFilters.doctorId" clearable filterable placeholder="按医生筛选" style="width: 220px">
+                <el-option
+                  v-for="doctor in scheduleDoctorOptions"
+                  :key="doctor.id"
+                  :label="`${doctor.name} · ${doctor.department}`"
+                  :value="doctor.id"
+                />
+              </el-select>
+              <el-date-picker v-model="scheduleFilters.workDate" value-format="YYYY-MM-DD" clearable placeholder="按日期筛选" />
+              <el-button type="primary" icon="Search" @click="loadSchedules">查询排班</el-button>
+              <el-button @click="resetScheduleFilters">重置筛选</el-button>
+            </div>
+
+            <div class="toolbar">
+              <el-select v-model="scheduleForm.doctorId" filterable placeholder="选择医生" style="width: 220px">
+                <el-option
+                  v-for="doctor in scheduleDoctorOptions"
+                  :key="doctor.id"
+                  :label="`${doctor.name} · ${doctor.department}`"
+                  :value="doctor.id"
+                />
+              </el-select>
+              <el-date-picker v-model="scheduleForm.workDate" value-format="YYYY-MM-DD" placeholder="排班日期" />
+              <el-time-select v-model="scheduleForm.startTime" start="08:00" step="00:30" end="17:00" />
+              <el-time-select v-model="scheduleForm.endTime" start="09:00" step="00:30" end="18:00" />
+              <el-input-number v-model="scheduleForm.capacity" :min="1" />
+              <el-button type="primary" icon="Plus" @click="saveSchedule">{{ scheduleForm.id ? '保存排班' : '新增排班' }}</el-button>
+              <el-button @click="resetScheduleForm">清空</el-button>
+            </div>
+
+            <el-table :data="schedules" stripe>
+              <el-table-column label="医生" min-width="180">
+                <template #default="{ row }">
+                  <strong>{{ row.doctor?.name || '-' }}</strong>
+                  <div class="muted">{{ row.doctor?.department || '-' }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="审核状态" width="110">
+                <template #default="{ row }">
+                  <el-tag :type="reviewStatusTag(row.doctor?.reviewStatus)">{{ reviewStatusLabel(row.doctor?.reviewStatus) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="schedule.workDate" label="日期" width="130" />
+              <el-table-column prop="schedule.startTime" label="开始" width="100" />
+              <el-table-column prop="schedule.endTime" label="结束" width="100" />
+              <el-table-column prop="schedule.capacity" label="容量" width="90" />
+              <el-table-column prop="schedule.bookedCount" label="已约" width="90" />
+              <el-table-column label="操作" width="180">
+                <template #default="{ row }">
+                  <el-button type="primary" link :disabled="!row.editable" @click="editSchedule(row)">编辑</el-button>
+                  <el-button type="danger" link :disabled="!row.editable" @click="deleteSchedule(row.schedule.id)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
+
           <el-tab-pane label="药品管理" name="medicines">
             <el-form :inline="true" :model="medicineForm" class="toolbar">
               <el-form-item><el-input v-model="medicineForm.name" placeholder="药品名称" /></el-form-item>
@@ -412,7 +471,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
-import { apiGet, apiPost, apiPut } from '../api'
+import { apiDelete, apiGet, apiPost, apiPut } from '../api'
 import { useAuthStore } from '../store'
 
 const router = useRouter()
@@ -422,6 +481,7 @@ const tabs = [
   { name: 'stats', label: '统计分析', icon: 'DataAnalysis' },
   { name: 'users', label: '用户管理', icon: 'UserFilled' },
   { name: 'doctors', label: '医生审核', icon: 'Checked' },
+  { name: 'schedules', label: '排班管理', icon: 'Calendar' },
   { name: 'medicines', label: '药品管理', icon: 'ShoppingBag' },
   { name: 'announcements', label: '公告管理', icon: 'Bell' },
   { name: 'records', label: '病例监督', icon: 'Document' },
@@ -440,6 +500,7 @@ setInterval(() => {
 const stats = ref<any>({})
 const users = ref<any[]>([])
 const doctors = ref<any[]>([])
+const schedules = ref<any[]>([])
 const medicines = ref<any[]>([])
 const announcements = ref<any[]>([])
 const orders = ref<any[]>([])
@@ -449,6 +510,8 @@ const appointments = ref<any[]>([])
 const logs = ref<any[]>([])
 
 const userForm = reactive({ username: '', name: '', role: 'PATIENT', password: '123456' })
+const scheduleFilters = reactive<{ doctorId?: number; workDate: string }>({ doctorId: undefined, workDate: '' })
+const scheduleForm = reactive<any>({ id: undefined, doctorId: undefined, workDate: '', startTime: '09:00', endTime: '12:00', capacity: 8, bookedCount: 0 })
 const medicineForm = reactive<any>({ id: undefined, name: '', effect: '', usageInstruction: '', price: 0, stock: 0, onShelf: true })
 const announcementForm = reactive<any>({ id: undefined, title: '', category: '通知', content: '', status: 'PUBLISHED' })
 
@@ -572,11 +635,13 @@ const medicineSalesRows = computed(() =>
   }))
 )
 const doctorWorkloadRows = computed(() => stats.value.doctorWorkload || [])
+const scheduleDoctorOptions = computed(() => doctors.value || [])
 
 async function loadAll() {
   stats.value = await apiGet('/admin/stats')
   users.value = await apiGet('/admin/users')
   doctors.value = await apiGet('/admin/doctors')
+  await loadSchedules()
   medicines.value = await apiGet('/admin/medicines')
   announcements.value = await apiGet('/admin/announcements')
   orders.value = await apiGet('/admin/orders')
@@ -584,6 +649,41 @@ async function loadAll() {
   prescriptions.value = await apiGet('/admin/prescriptions')
   appointments.value = await apiGet('/admin/appointments')
   logs.value = await apiGet('/admin/logs')
+}
+
+async function loadSchedules() {
+  const params: Record<string, unknown> = {}
+  if (scheduleFilters.doctorId) params.doctorId = scheduleFilters.doctorId
+  if (scheduleFilters.workDate) params.date = scheduleFilters.workDate
+  schedules.value = await apiGet('/admin/schedules', Object.keys(params).length ? params : undefined)
+}
+
+function resetScheduleFilters() {
+  scheduleFilters.doctorId = undefined
+  scheduleFilters.workDate = ''
+  loadSchedules()
+}
+
+function resetScheduleForm() {
+  Object.assign(scheduleForm, { id: undefined, doctorId: undefined, workDate: '', startTime: '09:00', endTime: '12:00', capacity: 8, bookedCount: 0 })
+}
+
+function editSchedule(row: any) {
+  Object.assign(scheduleForm, row.schedule)
+}
+
+async function saveSchedule() {
+  if (scheduleForm.id) await apiPut(`/admin/schedules/${scheduleForm.id}`, scheduleForm)
+  else await apiPost('/admin/schedules', scheduleForm)
+  ElMessage.success('排班已保存')
+  resetScheduleForm()
+  await loadSchedules()
+}
+
+async function deleteSchedule(id: number) {
+  await apiDelete(`/admin/schedules/${id}`)
+  ElMessage.success('排班已删除')
+  await loadSchedules()
 }
 
 async function createUser() {

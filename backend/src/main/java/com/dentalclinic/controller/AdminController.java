@@ -87,6 +87,28 @@ public class AdminController {
         return ApiResponse.ok(clinicService.qualifications().selectList(new QueryWrapper<DoctorQualification>().orderByDesc("submitted_at")));
     }
 
+    @GetMapping("/schedules")
+    public ApiResponse<List<Map<String, Object>>> schedules(@RequestParam(required = false) Long doctorId,
+                                                            @RequestParam(required = false) String date) {
+        return ApiResponse.ok(clinicService.adminSchedules(doctorId, date == null ? null : java.time.LocalDate.parse(date)));
+    }
+
+    @PostMapping("/schedules")
+    public ApiResponse<DoctorSchedule> createSchedule(@RequestBody DoctorSchedule request) {
+        return ApiResponse.ok(clinicService.adminCreateSchedule(request));
+    }
+
+    @PutMapping("/schedules/{id}")
+    public ApiResponse<DoctorSchedule> updateSchedule(@PathVariable Long id, @RequestBody DoctorSchedule request) {
+        return ApiResponse.ok(clinicService.adminUpdateSchedule(id, request));
+    }
+
+    @DeleteMapping("/schedules/{id}")
+    public ApiResponse<Void> deleteSchedule(@PathVariable Long id) {
+        clinicService.adminDeleteSchedule(id);
+        return ApiResponse.ok();
+    }
+
     @GetMapping("/medicines")
     public ApiResponse<List<Medicine>> medicines() {
         return ApiResponse.ok(clinicService.medicines().selectList(new QueryWrapper<Medicine>().orderByAsc("id")));

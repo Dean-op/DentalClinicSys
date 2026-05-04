@@ -9,6 +9,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -147,18 +148,27 @@ public class PatientController {
     @PostMapping("/messages")
     public ApiResponse<Message> createMessage(@RequestBody Message request) {
         PatientProfile patient = clinicService.currentPatient();
+        if (request.doctorId == null) {
+            throw new com.dentalclinic.common.BusinessException("请选择咨询医生");
+        }
+        if (!StringUtils.hasText(request.question)) {
+            throw new com.dentalclinic.common.BusinessException("咨询内容不能为空");
+        }
+        DoctorProfile doctor = clinicService.doctors().selectById(request.doctorId);
+        if (doctor == null || doctor.reviewStatus != com.dentalclinic.domain.ReviewStatus.APPROVED) {
+            throw new com.dentalclinic.common.BusinessException("咨询医生不可用");
+        }
         request.patientId = patient.id;
+        request.question = request.question.trim();
         request.createdAt = java.time.LocalDateTime.now();
         clinicService.messages().insert(request);
+        clinicService.log("CREATE_MESSAGE", "patient=" + patient.id + ", doctor=" + request.doctorId);
         return ApiResponse.ok(request);
     }
 
     @GetMapping("/messages")
-    public ApiResponse<List<Message>> messages() {
-        PatientProfile patient = clinicService.currentPatient();
-        return ApiResponse.ok(clinicService.messages().selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Message>().eq("patient_id", patient.id).orderByDesc("created_at")
-        ));
+    public ApiResponse<List<Map<String, Object>>> messages() {
+        return ApiResponse.ok(clinicService.myPatientMessageViews());
     }
 
     @PostMapping("/reviews")

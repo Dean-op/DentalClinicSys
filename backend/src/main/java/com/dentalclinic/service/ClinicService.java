@@ -255,6 +255,11 @@ public class ClinicService {
             .orderByDesc("publish_at"));
     }
 
+    public List<Announcement> doctorAnnouncements() {
+        currentDoctor(false);
+        return publishedAnnouncements();
+    }
+
     public List<Map<String, Object>> approvedDoctors() {
         return doctors.selectList(new QueryWrapper<DoctorProfile>().eq("review_status", ReviewStatus.APPROVED))
             .stream().map(this::doctorCard).toList();
@@ -275,6 +280,26 @@ public class ClinicService {
             .orderByAsc("work_date", "start_time"));
     }
 
+    public List<Map<String, Object>> adminSchedules(Long doctorId, LocalDate workDate) {
+        QueryWrapper<DoctorSchedule> wrapper = new QueryWrapper<>();
+        if (doctorId != null) {
+            wrapper.eq("doctor_id", doctorId);
+        }
+        if (workDate != null) {
+            wrapper.eq("work_date", workDate);
+        }
+        return schedules.selectList(wrapper.orderByAsc("doctor_id", "work_date", "start_time"))
+            .stream()
+            .map(schedule -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("schedule", schedule);
+                row.put("doctor", doctors.selectById(schedule.doctorId));
+                row.put("editable", schedule.bookedCount == null || schedule.bookedCount == 0);
+                return row;
+            })
+            .toList();
+    }
+
     public DoctorSchedule createMySchedule(DoctorSchedule request) {
         DoctorProfile doctor = currentDoctor(true);
         validateScheduleEditable(request.workDate, request.bookedCount);
@@ -282,6 +307,15 @@ public class ClinicService {
         request.bookedCount = request.bookedCount == null ? 0 : request.bookedCount;
         schedules.insert(request);
         log("CREATE_SCHEDULE", doctor.name + " " + request.workDate + " " + request.startTime + "-" + request.endTime);
+        return request;
+    }
+
+    public DoctorSchedule adminCreateSchedule(DoctorSchedule request) {
+        DoctorProfile doctor = requireDoctorProfile(request.doctorId);
+        validateScheduleEditable(request.workDate, 0);
+        request.bookedCount = request.bookedCount == null ? 0 : request.bookedCount;
+        schedules.insert(request);
+        log("ADMIN_CREATE_SCHEDULE", doctor.name + " " + request.workDate + " " + request.startTime + "-" + request.endTime);
         return request;
     }
 
@@ -302,6 +336,24 @@ public class ClinicService {
         return existing;
     }
 
+    public DoctorSchedule adminUpdateSchedule(Long id, DoctorSchedule request) {
+        DoctorSchedule existing = schedules.selectById(id);
+        if (existing == null) {
+            throw new BusinessException("排班记录不存在");
+        }
+        validateScheduleEditable(existing.workDate, existing.bookedCount);
+        validateScheduleEditable(request.workDate, existing.bookedCount);
+        DoctorProfile doctor = requireDoctorProfile(request.doctorId);
+        existing.doctorId = doctor.id;
+        existing.workDate = request.workDate;
+        existing.startTime = request.startTime;
+        existing.endTime = request.endTime;
+        existing.capacity = request.capacity;
+        schedules.updateById(existing);
+        log("ADMIN_UPDATE_SCHEDULE", doctor.name + " schedule=" + id);
+        return existing;
+    }
+
     public void deleteMySchedule(Long id) {
         DoctorProfile doctor = currentDoctor(true);
         DoctorSchedule existing = schedules.selectById(id);
@@ -311,6 +363,16 @@ public class ClinicService {
         validateScheduleEditable(existing.workDate, existing.bookedCount);
         schedules.deleteById(id);
         log("DELETE_SCHEDULE", doctor.name + " schedule=" + id);
+    }
+
+    public void adminDeleteSchedule(Long id) {
+        DoctorSchedule existing = schedules.selectById(id);
+        if (existing == null) {
+            throw new BusinessException("排班记录不存在");
+        }
+        validateScheduleEditable(existing.workDate, existing.bookedCount);
+        schedules.deleteById(id);
+        log("ADMIN_DELETE_SCHEDULE", "schedule=" + id);
     }
 
     private void validateScheduleEditable(LocalDate workDate, Integer bookedCount) {
@@ -352,6 +414,17 @@ public class ClinicService {
         return cartItems.selectList(new QueryWrapper<CartItem>().eq("patient_id", patient.id)).stream()
             .map(item -> Map.<String, Object>of("item", item, "medicine", medicines.selectById(item.medicineId)))
             .toList();
+    }
+
+    private DoctorProfile requireDoctorProfile(Long doctorId) {
+        if (doctorId == null) {
+            throw new BusinessException("请选择医生");
+        }
+        DoctorProfile doctor = doctors.selectById(doctorId);
+        if (doctor == null) {
+            throw new BusinessException("医生不存在");
+        }
+        return doctor;
     }
 
     @Transactional
@@ -506,6 +579,33 @@ public class ClinicService {
             .toList();
     }
 
+    public List<Map<String, Object>> myDoctorRecordViews(Long patientId, LocalDate dateFrom, LocalDate dateTo) {
+        DoctorProfile doctor = currentDoctor(true);
+        QueryWrapper<MedicalRecord> wrapper = new QueryWrapper<MedicalRecord>().eq("doctor_id", doctor.id);
+        if (patientId != null) {
+            wrapper.eq("patient_id", patientId);
+        }
+        if (dateFrom != null) {
+            wrapper.ge("created_at", dateFrom.atStartOfDay());
+        }
+        if (dateTo != null) {
+            wrapper.le("created_at", dateTo.atTime(23, 59, 59));
+        }
+        return records.selectList(wrapper.orderByDesc("created_at"))
+            .stream()
+            .map(this::recordWithPrescription)
+            .toList();
+    }
+
+    public Map<String, Object> myDoctorRecordDetail(Long recordId) {
+        DoctorProfile doctor = currentDoctor(true);
+        MedicalRecord record = records.selectById(recordId);
+        if (record == null || !Objects.equals(record.doctorId, doctor.id)) {
+            throw new BusinessException("病例不存在或无权查看");
+        }
+        return recordWithPrescription(record);
+    }
+
     public Map<String, Object> recordWithPrescription(MedicalRecord record) {
         List<Prescription> prescriptionRows = prescriptions.selectList(new QueryWrapper<Prescription>().eq("record_id", record.id));
         List<Map<String, Object>> prescriptionViews = prescriptionRows.stream().map(prescription -> {
@@ -542,6 +642,22 @@ public class ClinicService {
         row.put("paymentStatus", orderPaymentStatus(order.status));
         row.put("deliveryStatus", orderDeliveryStatus(order.status));
         return row;
+    }
+
+    public List<Map<String, Object>> myPatientMessageViews() {
+        PatientProfile patient = currentPatient();
+        return messages.selectList(new QueryWrapper<Message>().eq("patient_id", patient.id).orderByDesc("created_at"))
+            .stream()
+            .map(message -> {
+                boolean systemNotice = Optional.ofNullable(message.question).orElse("").startsWith("【预约通知】");
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("message", message);
+                row.put("doctor", message.doctorId == null ? null : doctors.selectById(message.doctorId));
+                row.put("systemNotice", systemNotice);
+                row.put("replyStatus", systemNotice ? "系统通知" : StringUtils.hasText(message.reply) ? "已回复" : "待回复");
+                return row;
+            })
+            .toList();
     }
 
     public Map<String, Object> consult(String symptoms) {
@@ -719,18 +835,33 @@ public class ClinicService {
     @Transactional
     public MedicalRecord saveRecord(MedicalRecord record) {
         DoctorProfile doctor = currentDoctor(true);
+        boolean isNew = record.id == null;
         record.doctorId = doctor.id;
-        if (record.createdAt == null) {
-            record.createdAt = LocalDateTime.now();
-        }
-        if (record.id == null) {
+        if (isNew) {
+            if (record.createdAt == null) {
+                record.createdAt = LocalDateTime.now();
+            }
             records.insert(record);
         } else {
+            MedicalRecord existing = records.selectById(record.id);
+            if (existing == null || !Objects.equals(existing.doctorId, doctor.id)) {
+                throw new BusinessException("病例不存在或无权修改");
+            }
+            record.createdAt = existing.createdAt;
+            if (record.patientId == null) {
+                record.patientId = existing.patientId;
+            }
+            if (record.appointmentId == null) {
+                record.appointmentId = existing.appointmentId;
+            }
             records.updateById(record);
         }
-        if (record.appointmentId != null) {
+        if (isNew && record.appointmentId != null) {
             Appointment appointment = appointments.selectById(record.appointmentId);
-            if (appointment != null) {
+            if (appointment == null || !Objects.equals(appointment.doctorId, doctor.id)) {
+                throw new BusinessException("预约记录不存在或无权操作");
+            }
+            if (!Objects.equals(appointment.status, AppointmentStatus.COMPLETED)) {
                 appointment.status = AppointmentStatus.COMPLETED;
                 appointment.statusReason = "本次就诊已完成，医生已保存病例记录。";
                 appointments.updateById(appointment);

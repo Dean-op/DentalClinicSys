@@ -22,11 +22,11 @@
               </div>
               <div v-if="recentAppointmentNotices.length === 0" class="empty-notice">暂无通知</div>
               <div v-else class="notice-list">
-                <div v-for="notice in recentAppointmentNotices" :key="notice.id" class="notice-item">
+                <div v-for="notice in recentAppointmentNotices" :key="notice.message.id" class="notice-item">
                   <el-icon class="notice-icon"><InfoFilled /></el-icon>
                   <span class="notice-text">
-                    {{ notice.question }}
-                    <span v-if="!isNoticeRead(notice.id)" class="notice-dot">新</span>
+                    {{ notice.message.question }}
+                    <span v-if="!isNoticeRead(notice.message.id)" class="notice-dot">新</span>
                   </span>
                 </div>
               </div>
@@ -97,7 +97,7 @@
             </el-table>
           </el-tab-pane>
 
-          <el-tab-pane label="药品购买" name="medicines">
+          <el-tab-pane label="药品查看/购买" name="medicines">
             <div class="toolbar">
               <el-button type="primary" icon="ShoppingCart" @click="submitOrder">按选择下单</el-button>
               <el-select v-model="deliveryMethod" style="width: 140px">
@@ -194,6 +194,59 @@
                 </div>
               </el-card>
             </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="留言管理" name="messages">
+            <el-row :gutter="24">
+              <el-col :md="10" :xs="24">
+                <div class="section-title">提交咨询</div>
+                <el-card class="message-form-card" shadow="hover">
+                  <el-form :model="messageForm" label-width="90px">
+                    <el-form-item label="咨询医生">
+                      <el-select v-model="messageForm.doctorId" placeholder="选择医生" filterable>
+                        <el-option
+                          v-for="row in doctors"
+                          :key="row.doctor.id"
+                          :label="`${row.doctor.name} · ${row.doctor.department}`"
+                          :value="row.doctor.id"
+                        />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="咨询内容">
+                      <el-input v-model="messageForm.question" type="textarea" :rows="6" placeholder="请输入想咨询医生的问题，例如术后注意事项、复诊安排、用药疑问等" />
+                    </el-form-item>
+                    <el-button type="primary" icon="Promotion" @click="submitMessage">提交留言</el-button>
+                  </el-form>
+                </el-card>
+              </el-col>
+
+              <el-col :md="14" :xs="24">
+                <div class="section-title">我的留言</div>
+                <el-empty v-if="!patientMessageRows.length" description="暂无咨询留言" :image-size="80" />
+                <div v-else class="message-list">
+                  <el-card v-for="row in patientMessageRows" :key="row.message.id" class="message-card" shadow="hover">
+                    <div class="message-meta">
+                      <div>
+                        <strong>{{ row.doctor?.name || '未指定医生' }}</strong>
+                        <div class="muted">{{ row.doctor?.department || '医生回复后将显示更多信息' }}</div>
+                      </div>
+                      <div class="message-status">
+                        <el-tag :type="messageStatusTag(row.replyStatus)" effect="light" round>{{ row.replyStatus }}</el-tag>
+                        <span class="message-time">{{ row.message.createdAt }}</span>
+                      </div>
+                    </div>
+                    <div class="message-question">
+                      <span class="label">我的问题：</span>
+                      <span>{{ row.message.question }}</span>
+                    </div>
+                    <div class="message-reply" :class="{ empty: !row.message.reply || row.replyStatus === '待回复' }">
+                      <span class="label">医生回复：</span>
+                      <span>{{ row.replyStatus === '待回复' ? '医生尚未回复，请耐心等待。' : row.message.reply }}</span>
+                    </div>
+                  </el-card>
+                </div>
+              </el-col>
+            </el-row>
           </el-tab-pane>
 
           <el-tab-pane label="病例查看" name="records">
@@ -364,10 +417,11 @@ const activeTab = ref('announcements')
 const tabs = [
   { name: 'announcements', label: '公告浏览', icon: 'Bell' },
   { name: 'doctors', label: '医生查询', icon: 'Avatar' },
-  { name: 'medicines', label: '药品购买', icon: 'ShoppingBag' },
+  { name: 'medicines', label: '药品查看/购买', icon: 'ShoppingBag' },
   { name: 'appointment', label: '在线预约', icon: 'Calendar' },
   { name: 'orders', label: '订单管理', icon: 'Tickets' },
   { name: 'appointments', label: '预约管理', icon: 'Calendar' },
+  { name: 'messages', label: '留言管理', icon: 'ChatDotSquare' },
   { name: 'records', label: '病例查看', icon: 'Document' },
   { name: 'ai', label: 'AI牙医', icon: 'MagicStick' }
 ]
@@ -388,11 +442,13 @@ const symptomInput = ref('')
 const consultResult = ref<any>(null)
 const consulting = ref(false)
 const seenNoticeIds = ref<number[]>([])
+const messageForm = reactive({ doctorId: undefined as number | undefined, question: '' })
 const appointmentForm = reactive({ doctorId: undefined as number | undefined, visitDate: '', timeSlot: '09:00', symptoms: '', demand: '' })
 
 const noticeStorageKey = computed(() => `patient_notice_seen_${auth.user?.id || auth.user?.username || 'anonymous'}`)
-const appointmentNotices = computed(() => messages.value.filter((item) => item.question?.startsWith('【预约通知】')))
-const unreadAppointmentNotices = computed(() => appointmentNotices.value.filter((item) => !seenNoticeIds.value.includes(item.id)))
+const appointmentNotices = computed(() => messages.value.filter((item) => item.systemNotice))
+const patientMessageRows = computed(() => messages.value.filter((item) => !item.systemNotice))
+const unreadAppointmentNotices = computed(() => appointmentNotices.value.filter((item) => !seenNoticeIds.value.includes(item.message.id)))
 const recentAppointmentNotices = computed(() => appointmentNotices.value.slice(0, 5))
 
 function restoreSeenNoticeIds() {
@@ -419,7 +475,7 @@ function isNoticeRead(id: number) {
 
 function markNoticesAsRead() {
   const ids = new Set(seenNoticeIds.value)
-  appointmentNotices.value.forEach((item) => ids.add(item.id))
+  appointmentNotices.value.forEach((item) => ids.add(item.message.id))
   seenNoticeIds.value = Array.from(ids)
   persistSeenNoticeIds()
 }
@@ -507,6 +563,10 @@ function reminderAlertType(level: string) {
   return 'info'
 }
 
+function messageStatusTag(status: string) {
+  return status === '已回复' ? 'success' : 'warning'
+}
+
 async function loadAll() {
   announcements.value = await apiGet('/patient/announcements')
   doctors.value = await apiGet('/patient/doctors')
@@ -546,6 +606,17 @@ async function quickBuy(medicine: any) {
   })
   ElMessage.success(`已购买 ${medicine.name}`)
   activeTab.value = 'orders'
+  await loadAll()
+}
+
+async function submitMessage() {
+  if (!messageForm.doctorId) return ElMessage.warning('请先选择咨询医生')
+  if (!messageForm.question.trim()) return ElMessage.warning('请输入咨询内容')
+  await apiPost('/patient/messages', { doctorId: messageForm.doctorId, question: messageForm.question.trim() })
+  ElMessage.success('留言已提交，医生回复后会在这里显示')
+  messageForm.doctorId = undefined
+  messageForm.question = ''
+  activeTab.value = 'messages'
   await loadAll()
 }
 
@@ -904,6 +975,61 @@ onMounted(async () => {
 }
 .med-name { color: #334155; font-weight: 500; }
 .med-usage { color: #64748b; font-size: 13px; }
+
+.message-form-card,
+.message-card {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.message-list {
+  display: grid;
+  gap: 16px;
+}
+
+.message-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.message-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.message-time {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.message-question,
+.message-reply {
+  display: flex;
+  gap: 8px;
+  line-height: 1.7;
+  font-size: 14px;
+  color: #334155;
+}
+
+.message-question + .message-reply {
+  margin-top: 10px;
+}
+
+.message-question .label,
+.message-reply .label {
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.message-reply.empty {
+  color: #0f766e;
+}
 
 .mt {
   margin-top: 12px;

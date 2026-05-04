@@ -59,6 +59,16 @@
             </el-form>
           </el-tab-pane>
 
+          <el-tab-pane label="公告查看" name="announcements">
+            <el-alert type="info" :closable="false" title="这里展示管理员已发布公告，方便医生及时查看门诊通知、工作安排和诊所活动。" />
+            <el-table :data="announcements" stripe class="mt">
+              <el-table-column prop="category" label="分类" width="120" />
+              <el-table-column prop="title" label="标题" width="220" />
+              <el-table-column prop="content" label="内容" min-width="280" />
+              <el-table-column prop="publishAt" label="发布时间" width="180" />
+            </el-table>
+          </el-tab-pane>
+
           <el-tab-pane label="出诊排班" name="schedules">
             <el-alert type="info" :closable="false" title="医生只能维护自己的未来空号；已有预约或历史排班不能修改/删除。" />
             <div class="toolbar mt">
@@ -162,7 +172,7 @@
                       </el-upload>
                       <el-link v-if="recordForm.reportImagePath" :href="recordForm.reportImagePath" target="_blank" type="primary" class="upload-link">查看已上传报告</el-link>
                     </el-form-item>
-                    <el-button type="primary" icon="DocumentChecked" @click="saveRecord">保存病例并完成接诊</el-button>
+                    <el-button type="primary" icon="DocumentChecked" @click="saveRecord">{{ recordForm.id ? '更新病例' : '保存病例并完成接诊' }}</el-button>
                   </el-form>
 
                 </el-col>
@@ -249,24 +259,55 @@
             </div>
           </el-tab-pane>
 
-          <el-tab-pane label="历史查询" name="history">
-            <el-alert type="info" :closable="false" title="历史查询用于查看当前医生接触过的患者记录。先从下拉框选择患者，再查询其既往病例。" />
+          <el-tab-pane label="病例管理" name="history">
+            <el-alert type="info" :closable="false" title="这里用于查看和维护当前医生本人创建的病例。可按患者和日期筛选，并回填到接诊表单继续编辑。" />
             <div class="toolbar">
-              <el-select v-model="historyPatientId" filterable placeholder="选择患者" style="width: 260px">
+              <el-select v-model="recordFilters.patientId" filterable clearable placeholder="按患者筛选" style="width: 260px">
                 <el-option
-                  v-for="patient in knownPatients"
+                  v-for="patient in casePatients"
                   :key="patient.id"
                   :label="`${patient.name}（ID ${patient.id}）`"
                   :value="patient.id"
                 />
               </el-select>
-              <el-button type="primary" icon="Search" @click="loadPatientHistory(historyPatientId)">查询患者历史</el-button>
+              <el-date-picker v-model="recordFilters.dateFrom" value-format="YYYY-MM-DD" clearable placeholder="开始日期" />
+              <el-date-picker v-model="recordFilters.dateTo" value-format="YYYY-MM-DD" clearable placeholder="结束日期" />
+              <el-button type="primary" icon="Search" @click="loadDoctorRecords">查询病例</el-button>
+              <el-button @click="resetRecordFilters">重置</el-button>
             </div>
-            <el-table :data="historyRecords" stripe>
-              <el-table-column prop="chiefComplaint" label="主诉" />
-              <el-table-column prop="diagnosis" label="诊断" />
-              <el-table-column prop="treatmentPlan" label="治疗方案" />
-              <el-table-column prop="createdAt" label="时间" width="180" />
+            <el-table :data="doctorRecords" stripe>
+              <el-table-column label="患者" width="120">
+                <template #default="{ row }">{{ row.patient?.name || '-' }}</template>
+              </el-table-column>
+              <el-table-column prop="record.chiefComplaint" label="主诉" min-width="180" />
+              <el-table-column prop="record.diagnosis" label="诊断" min-width="160" />
+              <el-table-column prop="record.treatmentPlan" label="治疗方案" min-width="220" />
+              <el-table-column label="关联预约" width="180">
+                <template #default="{ row }">
+                  {{ row.appointment?.visitDate || '-' }} {{ row.appointment?.timeSlot || '' }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="record.createdAt" label="记录时间" width="180" />
+              <el-table-column label="操作" width="120">
+                <template #default="{ row }">
+                  <el-button type="primary" link @click="editDoctorRecord(row.record.id)">编辑病例</el-button>
+                </template>
+              </el-table-column>
+              <el-table-column type="expand">
+                <template #default="{ row }">
+                  <div class="expand-box">
+                    <el-descriptions :column="2" border size="small">
+                      <el-descriptions-item label="现病史">{{ row.record.presentIllness || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="检查结果">{{ row.record.examination || '-' }}</el-descriptions-item>
+                      <el-descriptions-item label="检查报告">
+                        <el-link v-if="row.record.reportImagePath" :href="row.record.reportImagePath" target="_blank" type="primary">查看报告</el-link>
+                        <span v-else>-</span>
+                      </el-descriptions-item>
+                      <el-descriptions-item label="处方数量">{{ row.prescriptions?.length || 0 }}</el-descriptions-item>
+                    </el-descriptions>
+                  </div>
+                </template>
+              </el-table-column>
             </el-table>
           </el-tab-pane>
 
@@ -306,12 +347,13 @@ const auth = useAuthStore()
 const activeTab = ref('profile')
 const tabs = [
   { name: 'profile', label: '个人信息', icon: 'User' },
+  { name: 'announcements', label: '公告查看', icon: 'Bell' },
   { name: 'schedules', label: '出诊排班', icon: 'Calendar' },
   { name: 'appointments', label: '预约审核', icon: 'Tickets' },
   { name: 'reception', label: '待接诊', icon: 'FirstAidKit' },
   { name: 'records', label: '接诊管理', icon: 'Document' },
   { name: 'prescriptions', label: '电子药单', icon: 'Memo' },
-  { name: 'history', label: '历史查询', icon: 'Search' },
+  { name: 'history', label: '病例管理', icon: 'Search' },
   { name: 'stats', label: '留言统计', icon: 'DataAnalysis' }
 ]
 
@@ -319,6 +361,7 @@ const currentTabLabel = computed(() => tabs.find(t => t.name === activeTab.value
 
 const profile = ref<any>(null)
 const profileForm = reactive<any>({})
+const announcements = ref<any[]>([])
 const schedules = ref<any[]>([])
 const appointments = ref<any[]>([])
 const messages = ref<any[]>([])
@@ -328,11 +371,11 @@ const reviewDate = ref('')
 const receptionDate = ref('')
 const selectedEncounter = ref<any>(null)
 const patientHistory = ref<any[]>([])
-const historyRecords = ref<any[]>([])
-const historyPatientId = ref<number>()
+const doctorRecords = ref<any[]>([])
 const issuedPrescriptions = ref<any[]>([])
+const recordFilters = reactive<{ patientId?: number; dateFrom: string; dateTo: string }>({ patientId: undefined, dateFrom: '', dateTo: '' })
 const scheduleForm = reactive<any>({ id: undefined, workDate: '', startTime: '09:00', endTime: '12:00', capacity: 8, bookedCount: 0 })
-const recordForm = reactive<any>({ patientId: undefined, appointmentId: undefined, chiefComplaint: '', presentIllness: '', examination: '', diagnosis: '', treatmentPlan: '', reportImagePath: '' })
+const recordForm = reactive<any>({ id: undefined, patientId: undefined, appointmentId: undefined, chiefComplaint: '', presentIllness: '', examination: '', diagnosis: '', treatmentPlan: '', reportImagePath: '' })
 const prescriptionForm = reactive<any>({ recordId: undefined, patientId: undefined, note: '' })
 const prescriptionItem = reactive<any>({ frequency: '每日2次', dosage: '遵医嘱', days: 3 })
 const prescriptionMedicineId = ref<number>()
@@ -378,6 +421,14 @@ const knownPatients = computed(() => {
   })
   return Array.from(map.values())
 })
+const casePatients = computed(() => {
+  const map = new Map<number, any>()
+  knownPatients.value.forEach((patient) => map.set(patient.id, patient))
+  doctorRecords.value.forEach((row) => {
+    if (row.patient?.id) map.set(row.patient.id, row.patient)
+  })
+  return Array.from(map.values())
+})
 const selectedMedicine = computed(() => medicines.value.find((item) => item.id === prescriptionMedicineId.value))
 const prescriptionPreview = computed(() => {
   if (!selectedMedicine.value) return []
@@ -412,9 +463,11 @@ function matchesDateFilter(visitDate?: string, filterDate?: string) {
 async function loadAll() {
   profile.value = await apiGet('/doctor/profile')
   Object.assign(profileForm, profile.value)
+  announcements.value = await apiGet('/doctor/announcements').catch(() => [])
   schedules.value = await apiGet('/doctor/schedules').catch(() => [])
   medicines.value = await apiGet('/doctor/medicines').catch(() => [])
   await loadAppointments()
+  await loadDoctorRecords()
   messages.value = await apiGet('/doctor/messages').catch(() => [])
   stats.value = await apiGet('/doctor/stats').catch(() => ({}))
 }
@@ -479,6 +532,7 @@ async function rescheduleAppointment(row: any) {
 async function startReception(row: any) {
   selectedEncounter.value = row
   Object.assign(recordForm, {
+    id: undefined,
     patientId: row.patient.id,
     appointmentId: row.appointment.id,
     chiefComplaint: row.appointment.symptoms,
@@ -505,12 +559,18 @@ async function uploadReport(options: any) {
 
 async function saveRecord() {
   if (!selectedEncounter.value) return ElMessage.warning('请先选择接诊患者')
+  const isUpdate = Boolean(recordForm.id)
   const saved = await apiPost<any>('/doctor/records', recordForm)
   prescriptionForm.recordId = saved.id
   prescriptionForm.patientId = saved.patientId
-  ElMessage.success('病例已保存，预约已标记为完成并通知患者，可继续开具电子药单')
+  ElMessage.success(isUpdate ? '病例已更新' : '病例已保存，预约已标记为完成并通知患者，可继续开具电子药单')
   await loadAppointments()
-  activeTab.value = 'prescriptions'
+  await loadDoctorRecords()
+  if (isUpdate) {
+    activeTab.value = 'history'
+  } else {
+    activeTab.value = 'prescriptions'
+  }
 }
 
 async function createPrescription() {
@@ -540,7 +600,53 @@ async function loadPatientHistory(patientId?: number, forReception = false) {
   if (!patientId) return ElMessage.warning('请先选择患者')
   const rows = await apiGet(`/doctor/patients/${patientId}/records`)
   if (forReception) patientHistory.value = rows
-  else historyRecords.value = rows
+}
+
+async function loadDoctorRecords() {
+  const params: Record<string, unknown> = {}
+  if (recordFilters.patientId) params.patientId = recordFilters.patientId
+  if (recordFilters.dateFrom) params.dateFrom = recordFilters.dateFrom
+  if (recordFilters.dateTo) params.dateTo = recordFilters.dateTo
+  doctorRecords.value = await apiGet('/doctor/records', Object.keys(params).length ? params : undefined)
+}
+
+function resetRecordFilters() {
+  recordFilters.patientId = undefined
+  recordFilters.dateFrom = ''
+  recordFilters.dateTo = ''
+  loadDoctorRecords()
+}
+
+async function editDoctorRecord(id: number) {
+  const detail = await apiGet(`/doctor/records/${id}`)
+  const fallbackAppointment = {
+    id: detail.record.appointmentId,
+    visitDate: detail.appointment?.visitDate || '-',
+    timeSlot: detail.appointment?.timeSlot || '',
+    symptoms: detail.appointment?.symptoms || detail.record.chiefComplaint || '',
+    demand: detail.appointment?.demand || '',
+    status: detail.appointment?.status || 'COMPLETED'
+  }
+  selectedEncounter.value = {
+    patient: detail.patient,
+    appointment: fallbackAppointment
+  }
+  Object.assign(recordForm, {
+    id: detail.record.id,
+    patientId: detail.record.patientId,
+    appointmentId: detail.record.appointmentId,
+    chiefComplaint: detail.record.chiefComplaint || '',
+    presentIllness: detail.record.presentIllness || '',
+    examination: detail.record.examination || '',
+    diagnosis: detail.record.diagnosis || '',
+    treatmentPlan: detail.record.treatmentPlan || '',
+    reportImagePath: detail.record.reportImagePath || ''
+  })
+  Object.assign(prescriptionForm, { recordId: detail.record.id, patientId: detail.record.patientId, note: '' })
+  issuedPrescriptions.value = detail.prescriptions || []
+  prescriptionMedicineId.value = undefined
+  await loadPatientHistory(detail.patient?.id, true)
+  activeTab.value = 'records'
 }
 
 async function reply(id: number) {
