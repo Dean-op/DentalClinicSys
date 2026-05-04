@@ -69,6 +69,17 @@
             </el-table>
           </el-tab-pane>
 
+          <el-tab-pane label="药品查看" name="medicines">
+            <el-alert type="info" :closable="false" title="医生可查看当前系统药品信息，用于开具处方前确认名称、功效、说明和库存情况。" />
+            <el-table :data="medicines" stripe class="mt">
+              <el-table-column prop="name" label="药品" width="180" />
+              <el-table-column prop="effect" label="功效" min-width="180" />
+              <el-table-column prop="usageInstruction" label="使用说明" min-width="260" />
+              <el-table-column prop="price" label="价格" width="90" />
+              <el-table-column prop="stock" label="库存" width="90" />
+            </el-table>
+          </el-tab-pane>
+
           <el-tab-pane label="出诊排班" name="schedules">
             <el-alert type="info" :closable="false" title="医生只能维护自己的未来空号；已有预约或历史排班不能修改/删除。" />
             <div class="toolbar mt">
@@ -348,6 +359,7 @@ const activeTab = ref('profile')
 const tabs = [
   { name: 'profile', label: '个人信息', icon: 'User' },
   { name: 'announcements', label: '公告查看', icon: 'Bell' },
+  { name: 'medicines', label: '药品查看', icon: 'ShoppingBag' },
   { name: 'schedules', label: '出诊排班', icon: 'Calendar' },
   { name: 'appointments', label: '预约审核', icon: 'Tickets' },
   { name: 'reception', label: '待接诊', icon: 'FirstAidKit' },

@@ -97,7 +97,7 @@
             </el-table>
           </el-tab-pane>
 
-          <el-tab-pane label="药品查看/购买" name="medicines">
+          <el-tab-pane label="药品购买" name="medicines">
             <div class="toolbar">
               <el-button type="primary" icon="ShoppingCart" @click="submitOrder">按选择下单</el-button>
               <el-select v-model="deliveryMethod" style="width: 140px">
@@ -417,7 +417,7 @@ const activeTab = ref('announcements')
 const tabs = [
   { name: 'announcements', label: '公告浏览', icon: 'Bell' },
   { name: 'doctors', label: '医生查询', icon: 'Avatar' },
-  { name: 'medicines', label: '药品查看/购买', icon: 'ShoppingBag' },
+  { name: 'medicines', label: '药品购买', icon: 'ShoppingBag' },
   { name: 'appointment', label: '在线预约', icon: 'Calendar' },
   { name: 'orders', label: '订单管理', icon: 'Tickets' },
   { name: 'appointments', label: '预约管理', icon: 'Calendar' },
