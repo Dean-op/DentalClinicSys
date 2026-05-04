@@ -8,6 +8,13 @@
 - 后端：Spring Boot 3、Java 17、Spring Security JWT、MyBatis-Plus、MySQL 8
 - AI：OpenAI 兼容外部接口，配置保存在本地 MySQL 的 `ai_config` 表
 
+## 运行环境
+
+- Java 17
+- Node.js 18 及以上
+- npm
+- MySQL 8
+
 ## 当前功能
 
 - 患者端：公告浏览、医生查询、药品购买、在线预约、预约管理、订单管理、病例查看、留言管理、AI 牙医、用药提醒
@@ -26,11 +33,12 @@
 这套脚本会按以下顺序执行：
 
 1. 检查 `Java`、`Node.js`、`npm`、`mysql` 命令是否可用
-2. 自动创建 `dental_clinic` 数据库
-3. 导入 `backend/src/main/resources/schema.sql`
-4. 导入 `backend/src/main/resources/data.sql`
-5. 如前端依赖缺失则执行 `npm install`
-6. 先启动后端，再等待后端可访问后启动前端
+2. 校验 Node.js 主版本是否大于等于 `18`
+3. 自动创建 `dental_clinic` 数据库
+4. 导入 `backend/src/main/resources/schema.sql`
+5. 导入 `backend/src/main/resources/data.sql`
+6. 如前端依赖缺失则执行 `npm install`
+7. 先启动后端，再等待后端可访问后启动前端
 
 如果你的 MySQL 账号密码不是默认值，可以直接传参：
 

@@ -23,6 +23,22 @@ function Test-Command($Name) {
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+function Get-NodeMajorVersion {
+    $versionText = (& node -v).Trim()
+    if (-not $versionText) {
+        throw "Unable to detect Node.js version."
+    }
+    if ($versionText.StartsWith("v")) {
+        $versionText = $versionText.Substring(1)
+    }
+    $majorPart = $versionText.Split(".")[0]
+    $majorVersion = 0
+    if (-not [int]::TryParse($majorPart, [ref]$majorVersion)) {
+        throw "Unable to parse Node.js version: $versionText"
+    }
+    return $majorVersion
+}
+
 function Test-HttpReady($Url) {
     try {
         Invoke-WebRequest -Uri $Url -Method Get -TimeoutSec 2 -UseBasicParsing | Out-Null
@@ -97,6 +113,11 @@ foreach ($command in @("java", "node", "npm", "mysql")) {
     if (-not (Test-Command $command)) {
         throw "$command is not available in PATH."
     }
+}
+
+$NodeMajorVersion = Get-NodeMajorVersion
+if ($NodeMajorVersion -lt 18) {
+    throw "Detected Node.js major version $NodeMajorVersion. This project requires Node.js 18 or later."
 }
 
 if (-not $SkipDatabaseInit) {

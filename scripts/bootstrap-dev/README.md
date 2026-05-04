@@ -7,11 +7,19 @@
 运行 `bootstrap-dev.cmd` 或 `bootstrap-dev.ps1` 后，脚本会：
 
 1. 检查 `java`、`node`、`npm`、`mysql`
-2. 创建 `dental_clinic` 数据库
-3. 导入 `schema.sql`
-4. 导入 `data.sql`
-5. 检查并安装前端依赖
-6. 先启动后端，再启动前端
+2. 校验 Node.js 主版本是否大于等于 `18`
+3. 创建 `dental_clinic` 数据库
+4. 导入 `schema.sql`
+5. 导入 `data.sql`
+6. 检查并安装前端依赖
+7. 先启动后端，再启动前端
+
+## 前置环境
+
+- Java 17
+- Node.js 18 及以上
+- npm
+- MySQL 8
 
 ## 默认数据库参数
 
