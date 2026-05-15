@@ -3,7 +3,7 @@ param(
     [int]$DbPort = 3306,
     [string]$DbName = "dental_clinic",
     [string]$DbUser = "root",
-    [string]$DbPassword = "123456",
+    [string]$DbPassword = "",
     [switch]$SkipDatabaseInit,
     [switch]$SkipFrontendInstall
 )

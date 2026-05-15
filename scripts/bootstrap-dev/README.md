@@ -21,13 +21,15 @@
 - npm
 - MySQL 8
 
+如果本机 Node.js 低于 18，脚本会直接停止并提示升级，不会自动下载安装新版本。
+
 ## 默认数据库参数
 
 - Host: `localhost`
 - Port: `3306`
 - Database: `dental_clinic`
 - User: `root`
-- Password: `123456`
+- Password: ``
 
 ## 自定义数据库参数
 
