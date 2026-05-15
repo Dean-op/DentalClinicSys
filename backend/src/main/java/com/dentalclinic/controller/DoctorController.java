@@ -36,10 +36,12 @@ public class DoctorController {
     public ApiResponse<DoctorProfile> saveProfile(@RequestBody DoctorProfile request) {
         DoctorProfile profile = clinicService.currentDoctor(false);
         profile.name = request.name;
+        profile.gender = request.gender;
         profile.title = request.title;
         profile.department = request.department;
         profile.specialty = request.specialty;
         profile.introduction = request.introduction;
+        profile.consultationFee = request.consultationFee;
         clinicService.doctors().updateById(profile);
         return ApiResponse.ok(profile);
     }

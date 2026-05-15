@@ -26,6 +26,7 @@ Authorization: Bearer <token>
 
 - `GET /api/patient/profile`
 - `PUT /api/patient/profile`
+- `POST /api/patient/balance/recharge`
 - `GET /api/patient/announcements`
 - `GET /api/patient/doctors`
 - `GET /api/patient/doctors/{id}`

@@ -8,6 +8,7 @@ import com.dentalclinic.mapper.*;
 import com.dentalclinic.security.SecurityUtils;
 import com.dentalclinic.security.UserPrincipal;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -238,6 +239,9 @@ public class ClinicService {
         if (profile == null) {
             throw new BusinessException("patient profile not found");
         }
+        if (profile.balance == null) {
+            profile.balance = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
         return profile;
     }
 
@@ -427,21 +431,66 @@ public class ClinicService {
         return doctor;
     }
 
+    private BigDecimal normalizeMoney(BigDecimal amount) {
+        return (amount == null ? BigDecimal.ZERO : amount).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void ensurePatientBalance(PatientProfile patient, BigDecimal amount, String scene) {
+        BigDecimal normalized = normalizeMoney(amount);
+        if (patient.balance == null) {
+            patient.balance = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        if (patient.balance.compareTo(normalized) < 0) {
+            throw new BusinessException(scene + "余额不足，请先充值");
+        }
+    }
+
+    private DoctorSchedule requireSchedulableSlot(Long doctorId, LocalDate visitDate, LocalTime timeSlot, Long currentScheduleId) {
+        DoctorSchedule schedule = schedules.selectList(new QueryWrapper<DoctorSchedule>()
+                .eq("doctor_id", doctorId)
+                .eq("work_date", visitDate)
+                .orderByAsc("start_time"))
+            .stream()
+            .filter(item -> !timeSlot.isBefore(item.startTime) && timeSlot.isBefore(item.endTime))
+            .findFirst()
+            .orElseThrow(() -> new BusinessException("所选日期或时间不在医生排班范围内"));
+        if (!Objects.equals(schedule.id, currentScheduleId) && (schedule.bookedCount == null ? 0 : schedule.bookedCount) >= schedule.capacity) {
+            throw new BusinessException("当前排班号源已满，请重新选择");
+        }
+        return schedule;
+    }
+
+    private void increaseScheduleBookedCount(Long scheduleId, int delta) {
+        if (scheduleId == null) {
+            return;
+        }
+        DoctorSchedule schedule = schedules.selectById(scheduleId);
+        if (schedule == null) {
+            return;
+        }
+        schedule.bookedCount = Math.max(0, (schedule.bookedCount == null ? 0 : schedule.bookedCount) + delta);
+        schedules.updateById(schedule);
+    }
+
+    private void releaseScheduleSlot(Appointment appointment) {
+        if (appointment.scheduleId == null) {
+            return;
+        }
+        DoctorSchedule schedule = schedules.selectById(appointment.scheduleId);
+        if (schedule == null) {
+            return;
+        }
+        schedule.bookedCount = Math.max(0, (schedule.bookedCount == null ? 0 : schedule.bookedCount) - 1);
+        schedules.updateById(schedule);
+    }
+
     @Transactional
     public MedicineOrder createOrder(List<OrderLine> lines, String deliveryMethod) {
         PatientProfile patient = currentPatient();
         if (lines == null || lines.isEmpty()) {
             throw new BusinessException("order items required");
         }
-        MedicineOrder order = new MedicineOrder();
-        order.orderNo = "DCO" + System.currentTimeMillis();
-        order.patientId = patient.id;
-        order.deliveryMethod = StringUtils.hasText(deliveryMethod) ? deliveryMethod : "到店自取";
-        order.status = OrderStatus.PAID;
-        order.createdAt = LocalDateTime.now();
-        order.totalAmount = BigDecimal.ZERO;
-        orders.insert(order);
-
+        List<PreparedOrderItem> preparedItems = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
         for (OrderLine line : lines) {
             Medicine medicine = requireMedicine(line.medicineId());
@@ -449,6 +498,25 @@ public class ClinicService {
             if (Boolean.FALSE.equals(medicine.onShelf) || medicine.stock < quantity) {
                 throw new BusinessException(medicine.name + " stock is insufficient");
             }
+            preparedItems.add(new PreparedOrderItem(medicine, quantity));
+            total = total.add(medicine.price.multiply(BigDecimal.valueOf(quantity)));
+        }
+        ensurePatientBalance(patient, total, "药品购买");
+        patient.balance = patient.balance.subtract(total);
+        patients.updateById(patient);
+
+        MedicineOrder order = new MedicineOrder();
+        order.orderNo = "DCO" + System.currentTimeMillis();
+        order.patientId = patient.id;
+        order.deliveryMethod = StringUtils.hasText(deliveryMethod) ? deliveryMethod : "到店自取";
+        order.status = OrderStatus.PAID;
+        order.createdAt = LocalDateTime.now();
+        order.totalAmount = total;
+        orders.insert(order);
+
+        for (PreparedOrderItem preparedItem : preparedItems) {
+            Medicine medicine = preparedItem.medicine();
+            int quantity = preparedItem.quantity();
             medicine.stock -= quantity;
             medicines.updateById(medicine);
             OrderItem item = new OrderItem();
@@ -458,11 +526,8 @@ public class ClinicService {
             item.unitPrice = medicine.price;
             item.quantity = quantity;
             orderItems.insert(item);
-            total = total.add(medicine.price.multiply(BigDecimal.valueOf(quantity)));
         }
-        order.totalAmount = total;
-        orders.updateById(order);
-        log("CREATE_ORDER", order.orderNo);
+        log("CREATE_ORDER", order.orderNo + " amount=" + total);
         return order;
     }
 
@@ -491,8 +556,13 @@ public class ClinicService {
         if (order == null) {
             throw new BusinessException("order not found");
         }
+        OrderStatus previousStatus = order.status;
         order.status = status;
         orders.updateById(order);
+        if (status == OrderStatus.REFUNDED && previousStatus != OrderStatus.REFUNDED) {
+            refundOrderToBalance(order);
+            restoreOrderStock(order.id);
+        }
         log("UPDATE_ORDER", order.orderNo + " -> " + status);
     }
 
@@ -512,24 +582,33 @@ public class ClinicService {
         if (doctor == null || doctor.reviewStatus != ReviewStatus.APPROVED) {
             throw new BusinessException("doctor is unavailable");
         }
+        DoctorSchedule schedule = requireSchedulableSlot(doctorId, visitDate, timeSlot, null);
         Long conflicts = appointments.selectCount(new QueryWrapper<Appointment>()
             .eq("doctor_id", doctorId)
             .eq("visit_date", visitDate)
             .eq("time_slot", timeSlot)
-            .in("status", List.of(AppointmentStatus.SUBMITTED, AppointmentStatus.CONFIRMED)));
+            .in("status", List.of(AppointmentStatus.SUBMITTED, AppointmentStatus.CONFIRMED, AppointmentStatus.RESCHEDULED)));
         if (conflicts > 0) {
             throw new BusinessException("time slot is already booked");
         }
+        BigDecimal fee = normalizeMoney(doctor.consultationFee);
+        ensurePatientBalance(patient, fee, "挂号预约");
+        patient.balance = patient.balance.subtract(fee);
+        patients.updateById(patient);
         Appointment appointment = new Appointment();
         appointment.patientId = patient.id;
         appointment.doctorId = doctorId;
+        appointment.scheduleId = schedule.id;
         appointment.visitDate = visitDate;
         appointment.timeSlot = timeSlot;
         appointment.symptoms = symptoms;
         appointment.demand = demand;
+        appointment.feeAmount = fee;
+        appointment.feeRefunded = false;
         appointment.status = AppointmentStatus.SUBMITTED;
         appointment.createdAt = LocalDateTime.now();
         appointments.insert(appointment);
+        increaseScheduleBookedCount(schedule.id, 1);
         log("CREATE_APPOINTMENT", "doctor=" + doctorId + ", date=" + visitDate + " " + timeSlot);
         return appointment;
     }
@@ -542,11 +621,13 @@ public class ClinicService {
     }
 
     public Map<String, Object> appointmentView(Appointment appointment) {
-        return Map.of(
-            "appointment", appointment,
-            "doctor", doctors.selectById(appointment.doctorId),
-            "patient", patients.selectById(appointment.patientId)
-        );
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("appointment", appointment);
+        row.put("doctor", doctors.selectById(appointment.doctorId));
+        row.put("patient", patients.selectById(appointment.patientId));
+        row.put("schedule", appointment.scheduleId == null ? null : schedules.selectById(appointment.scheduleId));
+        row.put("reviewed", appointment.id != null && reviews.selectCount(new QueryWrapper<DoctorReview>().eq("appointment_id", appointment.id)) > 0);
+        return row;
     }
 
     public void cancelAppointment(Long id) {
@@ -555,8 +636,14 @@ public class ClinicService {
         if (appointment == null || !Objects.equals(appointment.patientId, patient.id)) {
             throw new BusinessException("appointment not found");
         }
+        if (!List.of(AppointmentStatus.SUBMITTED, AppointmentStatus.CONFIRMED, AppointmentStatus.RESCHEDULED).contains(appointment.status)) {
+            throw new BusinessException("当前预约状态不支持取消");
+        }
         appointment.status = AppointmentStatus.CANCELLED;
+        appointment.statusReason = "患者已取消预约。";
         appointments.updateById(appointment);
+        releaseScheduleSlot(appointment);
+        refundAppointmentFeeIfNeeded(appointment, "患者取消预约，挂号费已退回余额。");
     }
 
     public void rescheduleAppointment(Long id, LocalDate visitDate, LocalTime timeSlot) {
@@ -565,9 +652,25 @@ public class ClinicService {
         if (appointment == null || !Objects.equals(appointment.patientId, patient.id)) {
             throw new BusinessException("appointment not found");
         }
+        Long conflicts = appointments.selectCount(new QueryWrapper<Appointment>()
+            .eq("doctor_id", appointment.doctorId)
+            .eq("visit_date", visitDate)
+            .eq("time_slot", timeSlot)
+            .ne("id", appointment.id)
+            .in("status", List.of(AppointmentStatus.SUBMITTED, AppointmentStatus.CONFIRMED, AppointmentStatus.RESCHEDULED)));
+        if (conflicts > 0) {
+            throw new BusinessException("该时间段已被预约，请重新选择");
+        }
+        DoctorSchedule nextSchedule = requireSchedulableSlot(appointment.doctorId, visitDate, timeSlot, appointment.scheduleId);
+        if (!Objects.equals(appointment.scheduleId, nextSchedule.id)) {
+            releaseScheduleSlot(appointment);
+            increaseScheduleBookedCount(nextSchedule.id, 1);
+            appointment.scheduleId = nextSchedule.id;
+        }
         appointment.visitDate = visitDate;
         appointment.timeSlot = timeSlot;
         appointment.status = AppointmentStatus.RESCHEDULED;
+        appointment.statusReason = "患者已改期，请以最新预约时间为准。";
         appointments.updateById(appointment);
     }
 
@@ -746,6 +849,28 @@ public class ClinicService {
             throw new BusinessException("only submitted appointments can be rejected");
         }
         if (visitDate != null || timeSlot != null) {
+            LocalDate nextDate = visitDate == null ? appointment.visitDate : visitDate;
+            LocalTime nextTime = timeSlot == null ? appointment.timeSlot : timeSlot;
+            Long conflicts = appointments.selectCount(new QueryWrapper<Appointment>()
+                .eq("doctor_id", doctor.id)
+                .eq("visit_date", nextDate)
+                .eq("time_slot", nextTime)
+                .ne("id", appointment.id)
+                .in("status", List.of(AppointmentStatus.SUBMITTED, AppointmentStatus.CONFIRMED, AppointmentStatus.RESCHEDULED)));
+            if (conflicts > 0) {
+                throw new BusinessException("该时间段已被预约，请重新选择");
+            }
+            DoctorSchedule nextSchedule = requireSchedulableSlot(
+                doctor.id,
+                nextDate,
+                nextTime,
+                appointment.scheduleId
+            );
+            if (!Objects.equals(appointment.scheduleId, nextSchedule.id)) {
+                releaseScheduleSlot(appointment);
+                increaseScheduleBookedCount(nextSchedule.id, 1);
+                appointment.scheduleId = nextSchedule.id;
+            }
             status = AppointmentStatus.RESCHEDULED;
         }
         appointment.status = status;
@@ -757,6 +882,10 @@ public class ClinicService {
         }
         appointment.statusReason = appointmentNotice(appointment, doctor, status, reason);
         appointments.updateById(appointment);
+        if (status == AppointmentStatus.REJECTED) {
+            releaseScheduleSlot(appointment);
+            refundAppointmentFeeIfNeeded(appointment, "医生已拒绝预约，挂号费已退回余额。");
+        }
         createAppointmentNotification(appointment, doctor);
         log("DOCTOR_UPDATE_APPOINTMENT", id + " -> " + status);
     }
@@ -880,6 +1009,11 @@ public class ClinicService {
         prescriptions.insert(prescription);
         for (PrescriptionItem item : items) {
             Medicine medicine = requireMedicine(item.medicineId);
+            if (Boolean.FALSE.equals(medicine.onShelf) || medicine.stock <= 0) {
+                throw new BusinessException(medicine.name + " 库存不足，无法开具");
+            }
+            medicine.stock -= 1;
+            medicines.updateById(medicine);
             item.prescriptionId = prescription.id;
             item.medicineName = medicine.name;
             prescriptionItems.insert(item);
@@ -956,6 +1090,41 @@ public class ClinicService {
         return row;
     }
 
+    private void refundAppointmentFeeIfNeeded(Appointment appointment, String reason) {
+        if (Boolean.TRUE.equals(appointment.feeRefunded)) {
+            return;
+        }
+        BigDecimal fee = normalizeMoney(appointment.feeAmount);
+        if (fee.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        PatientProfile patient = patients.selectById(appointment.patientId);
+        patient.balance = patient.balance.add(fee);
+        patients.updateById(patient);
+        appointment.feeRefunded = true;
+        appointments.updateById(appointment);
+        log("REFUND_APPOINTMENT_FEE", "appointment=" + appointment.id + ", amount=" + fee + ", reason=" + reason);
+    }
+
+    private void refundOrderToBalance(MedicineOrder order) {
+        PatientProfile patient = patients.selectById(order.patientId);
+        BigDecimal amount = normalizeMoney(order.totalAmount);
+        patient.balance = patient.balance.add(amount);
+        patients.updateById(patient);
+        log("REFUND_ORDER_BALANCE", order.orderNo + " amount=" + amount);
+    }
+
+    private void restoreOrderStock(Long orderId) {
+        List<OrderItem> items = orderItems.selectList(new QueryWrapper<OrderItem>().eq("order_id", orderId));
+        for (OrderItem item : items) {
+            Medicine medicine = medicines.selectById(item.medicineId);
+            if (medicine != null) {
+                medicine.stock += item.quantity;
+                medicines.updateById(medicine);
+            }
+        }
+    }
+
     public Map<String, Object> doctorStats() {
         DoctorProfile doctor = currentDoctor(true);
         Long appointmentCount = appointments.selectCount(new QueryWrapper<Appointment>().eq("doctor_id", doctor.id));
@@ -976,19 +1145,45 @@ public class ClinicService {
         messages.updateById(message);
     }
 
-    public void reviewDoctor(Long doctorId, Integer rating, String comment) {
+    public void reviewDoctor(Long doctorId, Long appointmentId, Integer rating, String comment) {
         PatientProfile patient = currentPatient();
+        Appointment appointment = appointments.selectById(appointmentId);
+        if (appointment == null || !Objects.equals(appointment.patientId, patient.id) || !Objects.equals(appointment.doctorId, doctorId)) {
+            throw new BusinessException("预约记录不存在或无权评分");
+        }
+        if (appointment.status != AppointmentStatus.COMPLETED) {
+            throw new BusinessException("仅已完成的就诊可以评分");
+        }
+        if (reviews.selectCount(new QueryWrapper<DoctorReview>().eq("appointment_id", appointmentId)) > 0) {
+            throw new BusinessException("该次就诊已完成评分");
+        }
         DoctorReview review = new DoctorReview();
         review.patientId = patient.id;
         review.doctorId = doctorId;
+        review.appointmentId = appointmentId;
         review.rating = Math.max(1, Math.min(5, rating));
         review.comment = comment;
         review.createdAt = LocalDateTime.now();
         reviews.insert(review);
         List<DoctorReview> all = reviews.selectList(new QueryWrapper<DoctorReview>().eq("doctor_id", doctorId));
         DoctorProfile doctor = doctors.selectById(doctorId);
-        doctor.rating = all.stream().mapToInt(row -> row.rating).average().orElse(5.0);
+        doctor.rating = BigDecimal.valueOf(all.stream().mapToInt(row -> row.rating).average().orElse(5.0))
+            .setScale(1, RoundingMode.HALF_UP)
+            .doubleValue();
         doctors.updateById(doctor);
+    }
+
+    @Transactional
+    public PatientProfile rechargeBalance(BigDecimal amount) {
+        PatientProfile patient = currentPatient();
+        BigDecimal normalized = normalizeMoney(amount);
+        if (normalized.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("充值金额必须大于 0");
+        }
+        patient.balance = patient.balance.add(normalized);
+        patients.updateById(patient);
+        log("RECHARGE_BALANCE", "patient=" + patient.id + ", amount=" + normalized);
+        return patient;
     }
 
     public Map<String, Object> adminStats() {
@@ -1106,5 +1301,6 @@ public class ClinicService {
         logs.insert(log);
     }
 
+    private record PreparedOrderItem(Medicine medicine, int quantity) {}
     public record OrderLine(Long medicineId, int quantity) {}
 }

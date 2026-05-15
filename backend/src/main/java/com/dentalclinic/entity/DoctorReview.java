@@ -10,6 +10,7 @@ public class DoctorReview {
     public Long id;
     public Long patientId;
     public Long doctorId;
+    public Long appointmentId;
     public Integer rating;
     public String comment;
     public LocalDateTime createdAt;

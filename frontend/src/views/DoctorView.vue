@@ -22,7 +22,7 @@
 
       <div class="sidebar-footer">
         <div class="doc-info">
-          <el-avatar size="small" icon="UserFilled" class="doc-avatar" />
+          <el-avatar size="small" :src="doctorAvatarUrl" class="doc-avatar" />
           <div class="doc-text">
             <div class="doc-name">{{ profile?.name || '医生' }}</div>
             <div class="doc-title">{{ profile?.department || '未分配科室' }}</div>
@@ -49,10 +49,24 @@
           <el-tabs v-model="activeTab" class="hidden-header-tabs">
           <el-tab-pane label="个人信息" name="profile">
             <el-alert v-if="profile?.reviewStatus !== 'APPROVED'" type="warning" :closable="false" title="医生账号审核通过后，才可以维护排班、处理预约和接诊。" />
+            <div class="profile-hero-card">
+              <el-avatar :src="profileAvatarUrl" :size="84" class="profile-avatar" />
+              <div>
+                <div class="profile-hero-name">{{ profileForm.name || '医生' }}</div>
+                <div class="muted">{{ profileForm.department || '未分配科室' }} · 挂号费 {{ formatMoney(profileForm.consultationFee) }}</div>
+              </div>
+            </div>
             <el-form :model="profileForm" label-width="90px" class="narrow-form mt">
               <el-form-item label="姓名"><el-input v-model="profileForm.name" /></el-form-item>
+              <el-form-item label="性别">
+                <el-select v-model="profileForm.gender" placeholder="选择性别">
+                  <el-option label="男" value="男" />
+                  <el-option label="女" value="女" />
+                </el-select>
+              </el-form-item>
               <el-form-item label="职称"><el-input v-model="profileForm.title" /></el-form-item>
               <el-form-item label="科室"><el-input v-model="profileForm.department" /></el-form-item>
+              <el-form-item label="挂号费"><el-input-number v-model="profileForm.consultationFee" :min="0" :step="1" /></el-form-item>
               <el-form-item label="擅长"><el-input v-model="profileForm.specialty" /></el-form-item>
               <el-form-item label="简介"><el-input v-model="profileForm.introduction" type="textarea" /></el-form-item>
               <el-button type="primary" icon="Check" @click="saveProfile">保存资料</el-button>
@@ -327,7 +341,7 @@
               <div class="metric"><strong>{{ stats.appointmentCount || 0 }}</strong><span>预约量</span></div>
               <div class="metric"><strong>{{ stats.completedCount || 0 }}</strong><span>接诊量</span></div>
               <div class="metric"><strong>{{ stats.noShowCount || 0 }}</strong><span>爽约</span></div>
-              <div class="metric"><strong>{{ stats.rating || '-' }}</strong><span>评分</span></div>
+              <div class="metric"><strong>{{ formatRating(stats.rating) }}</strong><span>评分</span></div>
             </div>
             <el-table :data="messages" stripe>
               <el-table-column prop="question" label="用户留言" />
@@ -370,6 +384,8 @@ const tabs = [
 ]
 
 const currentTabLabel = computed(() => tabs.find(t => t.name === activeTab.value)?.label || '')
+const doctorAvatarUrl = computed(() => avatarForDoctor(profile.value?.gender))
+const profileAvatarUrl = computed(() => avatarForDoctor(profileForm.gender))
 
 const profile = ref<any>(null)
 const profileForm = reactive<any>({})
@@ -470,6 +486,19 @@ function appointmentStatusTag(status: string) {
 function matchesDateFilter(visitDate?: string, filterDate?: string) {
   if (!filterDate) return true
   return visitDate === filterDate
+}
+
+function avatarForDoctor(gender?: string) {
+  return gender === '女' ? '/avatars/doctor-female.svg' : '/avatars/doctor-male.svg'
+}
+
+function formatMoney(value?: number) {
+  return `¥${Number(value || 0).toFixed(2)}`
+}
+
+function formatRating(value?: number) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
+  return Number(value).toFixed(1)
 }
 
 async function loadAll() {
@@ -827,6 +856,20 @@ onMounted(loadAll)
 
 .narrow-form {
   max-width: 680px;
+}
+.profile-hero-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.08), rgba(59, 130, 246, 0.02));
+  border: 1px solid rgba(30, 64, 175, 0.12);
+}
+.profile-hero-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e3a8a;
 }
 .mt {
   margin-top: 12px;

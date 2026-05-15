@@ -32,6 +32,7 @@
               </div>
             </div>
           </el-popover>
+          <el-avatar :src="patientAvatarUrl" size="small" class="user-avatar" />
           <div class="user-greeting">欢迎，{{ auth.user?.profile?.name || auth.user?.username }}</div>
           <el-button plain round size="small" class="logout-btn" @click="logout">退出登录</el-button>
         </div>
@@ -69,6 +70,47 @@
           </div>
           <div class="panel-body">
             <el-tabs v-model="activeTab" class="hidden-header-tabs">
+          <el-tab-pane label="个人中心" name="profile">
+            <el-row :gutter="24">
+              <el-col :md="8" :xs="24">
+                <el-card class="profile-summary-card" shadow="hover">
+                  <div class="profile-summary">
+                    <el-avatar :src="patientAvatarUrl" :size="88" class="profile-avatar" />
+                    <div class="profile-name">{{ patientProfile.name || auth.user?.username || '患者' }}</div>
+                    <div class="muted">{{ patientProfile.gender || '未填写性别' }} · {{ patientProfile.phone || '未填写联系方式' }}</div>
+                  </div>
+                  <div class="balance-card">
+                    <span>账户余额</span>
+                    <strong>{{ formatMoney(patientProfile.balance) }}</strong>
+                  </div>
+                  <div class="toolbar">
+                    <el-input-number v-model="rechargeAmount" :min="1" :step="50" />
+                    <el-button type="primary" icon="Wallet" @click="rechargeBalance">模拟充值</el-button>
+                  </div>
+                </el-card>
+              </el-col>
+
+              <el-col :md="16" :xs="24">
+                <el-card shadow="hover">
+                  <div class="section-title">基本资料</div>
+                  <el-form :model="patientProfile" label-width="90px" class="narrow-form">
+                    <el-form-item label="姓名"><el-input v-model="patientProfile.name" /></el-form-item>
+                    <el-form-item label="性别">
+                      <el-select v-model="patientProfile.gender" placeholder="选择性别">
+                        <el-option label="男" value="男" />
+                        <el-option label="女" value="女" />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="电话"><el-input v-model="patientProfile.phone" /></el-form-item>
+                    <el-form-item label="地址"><el-input v-model="patientProfile.address" /></el-form-item>
+                    <el-form-item label="过敏史"><el-input v-model="patientProfile.allergyHistory" type="textarea" :rows="3" /></el-form-item>
+                    <el-button type="primary" icon="Check" @click="saveProfile">保存资料</el-button>
+                  </el-form>
+                </el-card>
+              </el-col>
+            </el-row>
+          </el-tab-pane>
+
           <el-tab-pane label="公告浏览" name="announcements">
             <el-table :data="announcements" stripe>
               <el-table-column prop="category" label="类型" width="120" />
@@ -79,6 +121,34 @@
 
           <el-tab-pane label="医生查询" name="doctors">
             <el-table :data="doctors" stripe>
+              <el-table-column type="expand">
+                <template #default="{ row }">
+                  <div class="doctor-expand">
+                    <div class="doctor-fee-line">
+                      <strong>挂号费：</strong>
+                      <span>{{ formatMoney(row.doctor.consultationFee) }}</span>
+                    </div>
+                    <div class="doctor-schedule-title">近期排班</div>
+                    <el-empty v-if="!row.schedules?.length" description="暂无可预约排班" :image-size="50" />
+                    <div v-else class="schedule-chip-list">
+                      <div v-for="schedule in row.schedules" :key="schedule.id" class="schedule-chip">
+                        <div>
+                          <strong>{{ schedule.workDate }}</strong>
+                          <div class="muted">{{ schedule.startTime }} - {{ schedule.endTime }}</div>
+                        </div>
+                        <div class="schedule-chip-actions">
+                          <el-tag size="small" :type="schedule.capacity - schedule.bookedCount > 0 ? 'success' : 'danger'">
+                            剩余 {{ Math.max(0, schedule.capacity - schedule.bookedCount) }} 号
+                          </el-tag>
+                          <el-button type="primary" link :disabled="schedule.capacity - schedule.bookedCount <= 0" @click="selectSchedule(row.doctor.id, schedule)">
+                            按此排班预约
+                          </el-button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </el-table-column>
               <el-table-column label="医生">
                 <template #default="{ row }">
                   <strong>{{ row.doctor.name }}</strong>
@@ -86,8 +156,11 @@
                 </template>
               </el-table-column>
               <el-table-column label="擅长" prop="doctor.specialty" />
+              <el-table-column label="挂号费" width="100">
+                <template #default="{ row }">{{ formatMoney(row.doctor.consultationFee) }}</template>
+              </el-table-column>
               <el-table-column label="评分" width="90">
-                <template #default="{ row }">{{ row.doctor.rating }}</template>
+                <template #default="{ row }">{{ formatRating(row.doctor.rating) }}</template>
               </el-table-column>
               <el-table-column label="操作" width="120">
                 <template #default="{ row }">
@@ -122,11 +195,31 @@
                   <el-option v-for="row in doctors" :key="row.doctor.id" :label="row.doctor.name" :value="row.doctor.id" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="日期">
-                <el-date-picker v-model="appointmentForm.visitDate" value-format="YYYY-MM-DD" />
+              <el-form-item label="排班">
+                <el-select v-model="selectedScheduleKey" placeholder="选择排班时段" @change="applySelectedSchedule">
+                  <el-option
+                    v-for="schedule in selectedDoctorSchedules"
+                    :key="`${schedule.id}`"
+                    :label="`${schedule.workDate} ${schedule.startTime}-${schedule.endTime}（剩余 ${Math.max(0, schedule.capacity - schedule.bookedCount)}）`"
+                    :value="String(schedule.id)"
+                    :disabled="schedule.capacity - schedule.bookedCount <= 0"
+                  />
+                </el-select>
               </el-form-item>
-              <el-form-item label="时间段">
-                <el-time-select v-model="appointmentForm.timeSlot" start="09:00" step="00:30" end="18:00" />
+              <el-form-item label="排班日期">
+                <el-input :model-value="appointmentForm.visitDate || '请选择排班'" disabled />
+              </el-form-item>
+              <el-form-item label="就诊时间">
+                <el-time-select
+                  v-model="appointmentForm.timeSlot"
+                  :start="selectedScheduleObject?.startTime || '09:00'"
+                  step="00:30"
+                  :end="selectedScheduleObject?.endTime || '18:00'"
+                  :disabled="!selectedScheduleObject"
+                />
+              </el-form-item>
+              <el-form-item label="挂号费">
+                <el-input :model-value="formatMoney(selectedDoctorFee)" disabled />
               </el-form-item>
               <el-form-item label="症状">
                 <el-input v-model="appointmentForm.symptoms" type="textarea" />
@@ -179,6 +272,10 @@
                     <span class="value">{{ row.doctor.name }}</span>
                   </div>
                   <div class="apt-info">
+                    <span class="label">挂号费：</span>
+                    <span class="value">{{ formatMoney(row.appointment.feeAmount) }}</span>
+                  </div>
+                  <div class="apt-info">
                     <span class="label">初步症状：</span>
                     <span class="value">{{ row.appointment.symptoms || '未填写' }}</span>
                   </div>
@@ -188,6 +285,16 @@
                   </div>
                 </div>
                 <div class="apt-footer">
+                  <el-button
+                    v-if="row.appointment.status === 'COMPLETED' && !row.reviewed"
+                    type="primary"
+                    plain
+                    round
+                    size="small"
+                    @click="openReviewDialog(row)"
+                  >
+                    评价医生
+                  </el-button>
                   <el-button type="danger" plain round size="small" :disabled="!canCancel(row.appointment.status)" @click="cancelAppointment(row.appointment.id)">
                     取消预约
                   </el-button>
@@ -401,6 +508,21 @@
         </section>
       </div>
     </main>
+
+    <el-dialog v-model="reviewDialog.visible" title="评价医生" width="420px">
+      <el-form label-width="80px">
+        <el-form-item label="评分">
+          <el-rate v-model="reviewDialog.rating" />
+        </el-form-item>
+        <el-form-item label="评价">
+          <el-input v-model="reviewDialog.comment" type="textarea" :rows="4" placeholder="说说本次就诊体验，帮助其他患者更好选择医生" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="reviewDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="submitReview">提交评价</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -413,8 +535,9 @@ import { useAuthStore } from '../store'
 
 const router = useRouter()
 const auth = useAuthStore()
-const activeTab = ref('announcements')
+const activeTab = ref('profile')
 const tabs = [
+  { name: 'profile', label: '个人中心', icon: 'User' },
   { name: 'announcements', label: '公告浏览', icon: 'Bell' },
   { name: 'doctors', label: '医生查询', icon: 'Avatar' },
   { name: 'medicines', label: '药品购买', icon: 'ShoppingBag' },
@@ -427,6 +550,15 @@ const tabs = [
 ]
 
 const currentTabLabel = computed(() => tabs.find(t => t.name === activeTab.value)?.label || '')
+const patientAvatarUrl = computed(() => avatarForPatient(patientProfile.gender))
+const selectedDoctorCard = computed(() => doctors.value.find((row) => row.doctor.id === appointmentForm.doctorId) || null)
+const selectedDoctorSchedules = computed(() => (selectedDoctorCard.value?.schedules || []).sort((left: any, right: any) => {
+  const leftKey = `${left.workDate || ''} ${left.startTime || ''}`
+  const rightKey = `${right.workDate || ''} ${right.startTime || ''}`
+  return leftKey.localeCompare(rightKey)
+}))
+const selectedScheduleObject = computed(() => selectedDoctorSchedules.value.find((item: any) => String(item.id) === selectedScheduleKey.value) || null)
+const selectedDoctorFee = computed(() => selectedDoctorCard.value?.doctor?.consultationFee || 0)
 
 const announcements = ref<any[]>([])
 const doctors = ref<any[]>([])
@@ -442,7 +574,17 @@ const symptomInput = ref('')
 const consultResult = ref<any>(null)
 const consulting = ref(false)
 const seenNoticeIds = ref<number[]>([])
+const rechargeAmount = ref(100)
+const selectedScheduleKey = ref('')
+const patientProfile = reactive<any>({ name: '', gender: '', phone: '', address: '', allergyHistory: '', balance: 0 })
 const messageForm = reactive({ doctorId: undefined as number | undefined, question: '' })
+const reviewDialog = reactive<{ visible: boolean; appointmentId?: number; doctorId?: number; rating: number; comment: string }>({
+  visible: false,
+  appointmentId: undefined,
+  doctorId: undefined,
+  rating: 5,
+  comment: ''
+})
 const appointmentForm = reactive({ doctorId: undefined as number | undefined, visitDate: '', timeSlot: '09:00', symptoms: '', demand: '' })
 
 const noticeStorageKey = computed(() => `patient_notice_seen_${auth.user?.id || auth.user?.username || 'anonymous'}`)
@@ -557,6 +699,19 @@ function orderStatusTag(status: string) {
   return 'info'
 }
 
+function avatarForPatient(gender?: string) {
+  return gender === '女' ? '/avatars/patient-female.svg' : '/avatars/patient-male.svg'
+}
+
+function formatMoney(value?: number) {
+  return `¥${Number(value || 0).toFixed(2)}`
+}
+
+function formatRating(value?: number) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
+  return Number(value).toFixed(1)
+}
+
 function reminderAlertType(level: string) {
   if (level === 'overdue') return 'error'
   if (level === 'urgent') return 'warning'
@@ -568,6 +723,7 @@ function messageStatusTag(status: string) {
 }
 
 async function loadAll() {
+  Object.assign(patientProfile, await apiGet('/patient/profile'))
   announcements.value = await apiGet('/patient/announcements')
   doctors.value = await apiGet('/patient/doctors')
   medicines.value = await apiGet('/patient/medicines')
@@ -580,11 +736,39 @@ async function loadAll() {
 
 function selectDoctor(id: number) {
   appointmentForm.doctorId = id
+  selectedScheduleKey.value = ''
+  appointmentForm.visitDate = ''
+  appointmentForm.timeSlot = ''
   activeTab.value = 'appointment'
+}
+
+function selectSchedule(doctorId: number, schedule: any) {
+  appointmentForm.doctorId = doctorId
+  selectedScheduleKey.value = String(schedule.id)
+  appointmentForm.visitDate = schedule.workDate
+  appointmentForm.timeSlot = schedule.startTime
+  activeTab.value = 'appointment'
+}
+
+function applySelectedSchedule() {
+  const schedule = selectedScheduleObject.value
+  if (!schedule) return
+  appointmentForm.visitDate = schedule.workDate
+  appointmentForm.timeSlot = schedule.startTime
 }
 
 function canCancel(status: string) {
   return ['SUBMITTED', 'CONFIRMED', 'RESCHEDULED'].includes(status)
+}
+
+async function saveProfile() {
+  const saved = await apiPut('/patient/profile', patientProfile)
+  Object.assign(patientProfile, saved)
+  if (auth.user) {
+    auth.user.profile = saved
+    localStorage.setItem('user', JSON.stringify(auth.user))
+  }
+  ElMessage.success('个人资料已保存')
 }
 
 async function submitOrder() {
@@ -609,6 +793,16 @@ async function quickBuy(medicine: any) {
   await loadAll()
 }
 
+async function rechargeBalance() {
+  const saved = await apiPost('/patient/balance/recharge', { amount: rechargeAmount.value })
+  Object.assign(patientProfile, saved)
+  if (auth.user) {
+    auth.user.profile = saved
+    localStorage.setItem('user', JSON.stringify(auth.user))
+  }
+  ElMessage.success(`已模拟充值 ${formatMoney(rechargeAmount.value)}`)
+}
+
 async function submitMessage() {
   if (!messageForm.doctorId) return ElMessage.warning('请先选择咨询医生')
   if (!messageForm.question.trim()) return ElMessage.warning('请输入咨询内容')
@@ -621,6 +815,9 @@ async function submitMessage() {
 }
 
 async function createAppointment() {
+  if (!appointmentForm.doctorId || !appointmentForm.visitDate || !appointmentForm.timeSlot) {
+    return ElMessage.warning('请先选择医生排班')
+  }
   await apiPost('/patient/appointments', appointmentForm)
   ElMessage.success('预约已提交，请等待医生确认')
   activeTab.value = 'appointments'
@@ -636,6 +833,27 @@ async function refund(id: number) {
 async function cancelAppointment(id: number) {
   await apiPut(`/patient/appointments/${id}/cancel`)
   ElMessage.success('预约已取消')
+  await loadAll()
+}
+
+function openReviewDialog(row: any) {
+  reviewDialog.visible = true
+  reviewDialog.appointmentId = row.appointment.id
+  reviewDialog.doctorId = row.doctor.id
+  reviewDialog.rating = 5
+  reviewDialog.comment = ''
+}
+
+async function submitReview() {
+  if (!reviewDialog.appointmentId || !reviewDialog.doctorId) return
+  await apiPost('/patient/reviews', {
+    doctorId: reviewDialog.doctorId,
+    appointmentId: reviewDialog.appointmentId,
+    rating: reviewDialog.rating,
+    comment: reviewDialog.comment
+  })
+  reviewDialog.visible = false
+  ElMessage.success('感谢你的评价')
   await loadAll()
 }
 
@@ -716,6 +934,10 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.user-avatar {
+  border: 2px solid #ccfbf1;
 }
 
 .user-greeting {
@@ -841,6 +1063,49 @@ onMounted(async () => {
 .mb { margin-bottom: 12px; }
 .mt-large { margin-top: 24px; }
 
+.profile-summary-card {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.profile-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.profile-avatar {
+  border: 3px solid #ccfbf1;
+}
+
+.profile-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.balance-card {
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  color: #ffffff;
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+.balance-card span {
+  display: block;
+  opacity: 0.84;
+  margin-bottom: 8px;
+}
+
+.balance-card strong {
+  font-size: 30px;
+  font-weight: 700;
+}
+
 .notice-carousel {
   border-radius: 8px;
   overflow: hidden;
@@ -867,6 +1132,44 @@ onMounted(async () => {
   height: 16px;
   background: #0d9488;
   border-radius: 2px;
+}
+
+.doctor-expand {
+  padding: 8px 0;
+}
+
+.doctor-fee-line {
+  margin-bottom: 14px;
+  color: #0f172a;
+}
+
+.doctor-schedule-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #334155;
+}
+
+.schedule-chip-list {
+  display: grid;
+  gap: 10px;
+}
+
+.schedule-chip {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #f8fafc;
+}
+
+.schedule-chip-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* Appointments Card */

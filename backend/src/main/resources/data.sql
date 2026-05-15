@@ -14,31 +14,34 @@ INSERT INTO user_account (id, username, password_hash, role, status, created_at)
   status = VALUES(status),
   created_at = VALUES(created_at);
 
-INSERT INTO patient_profile (id, user_id, name, gender, phone, address, allergy_history) VALUES
-(1, 3, '李明', '男', '13800000001', '广州市天河区示例路 18 号', '青霉素过敏'),
-(2, 6, '张晓雨', '女', '13800000002', '广州市越秀区健康路 8 号', '无'),
-(3, 7, '刘浩', '男', '13800000003', '广州市海珠区滨江路 66 号', '布洛芬不耐受') ON DUPLICATE KEY UPDATE
+INSERT INTO patient_profile (id, user_id, name, gender, phone, address, allergy_history, balance) VALUES
+(1, 3, '李明', '男', '13800000001', '广州市天河区示例路 18 号', '青霉素过敏', 320.00),
+(2, 6, '张晓雨', '女', '13800000002', '广州市越秀区健康路 8 号', '无', 180.00),
+(3, 7, '刘浩', '男', '13800000003', '广州市海珠区滨江路 66 号', '布洛芬不耐受', 260.00) ON DUPLICATE KEY UPDATE
   user_id = VALUES(user_id),
   name = VALUES(name),
   gender = VALUES(gender),
   phone = VALUES(phone),
   address = VALUES(address),
-  allergy_history = VALUES(allergy_history);
+  allergy_history = VALUES(allergy_history),
+  balance = VALUES(balance);
 
-INSERT INTO doctor_profile (id, user_id, name, title, department, specialty, introduction, review_status, rating) VALUES
-(1, 2, '陈洁', '主治医师', '口腔综合科', '龋齿修复、牙髓炎、牙周基础治疗', '从事口腔临床工作 8 年，擅长常见口腔疾病诊疗与患者健康宣教。', 'APPROVED', 4.8),
-(2, 4, '王启航', '副主任医师', '牙周科', '牙龈炎、牙周炎、洁治与牙周维护', '长期负责牙周基础治疗与复诊维护，重视患者刷牙和牙线习惯管理。', 'APPROVED', 4.7),
-(3, 5, '赵宁', '医师', '儿童口腔科', '儿童龋齿、窝沟封闭、涂氟', '关注儿童就诊体验，擅长儿童口腔预防和早期龋齿处理。', 'PENDING', 5.0),
-(4, 8, '孙雅', '主治医师', '正畸科', '青少年早期矫治、隐形矫正咨询、牙列不齐评估', '擅长正畸初筛和矫治方案沟通，重视美观与咬合功能平衡。', 'APPROVED', 4.9),
-(5, 9, '林周', '副主任医师', '修复种植科', '牙体缺损修复、嵌体修复、种植修复评估', '长期从事口腔修复与种植修复评估，擅长复杂缺牙修复设计。', 'APPROVED', 4.6) ON DUPLICATE KEY UPDATE
+INSERT INTO doctor_profile (id, user_id, name, gender, title, department, specialty, introduction, review_status, rating, consultation_fee) VALUES
+(1, 2, '陈洁', '女', '主治医师', '口腔综合科', '龋齿修复、牙髓炎、牙周基础治疗', '从事口腔临床工作 8 年，擅长常见口腔疾病诊疗与患者健康宣教。', 'APPROVED', 4.8, 28.00),
+(2, 4, '王启航', '男', '副主任医师', '牙周科', '牙龈炎、牙周炎、洁治与牙周维护', '长期负责牙周基础治疗与复诊维护，重视患者刷牙和牙线习惯管理。', 'APPROVED', 4.7, 35.00),
+(3, 5, '赵宁', '女', '医师', '儿童口腔科', '儿童龋齿、窝沟封闭、涂氟', '关注儿童就诊体验，擅长儿童口腔预防和早期龋齿处理。', 'PENDING', 5.0, 22.00),
+(4, 8, '孙雅', '女', '主治医师', '正畸科', '青少年早期矫治、隐形矫正咨询、牙列不齐评估', '擅长正畸初筛和矫治方案沟通，重视美观与咬合功能平衡。', 'APPROVED', 4.9, 40.00),
+(5, 9, '林周', '男', '副主任医师', '修复种植科', '牙体缺损修复、嵌体修复、种植修复评估', '长期从事口腔修复与种植修复评估，擅长复杂缺牙修复设计。', 'APPROVED', 4.6, 45.00) ON DUPLICATE KEY UPDATE
   user_id = VALUES(user_id),
   name = VALUES(name),
+  gender = VALUES(gender),
   title = VALUES(title),
   department = VALUES(department),
   specialty = VALUES(specialty),
   introduction = VALUES(introduction),
   review_status = VALUES(review_status),
-  rating = VALUES(rating);
+  rating = VALUES(rating),
+  consultation_fee = VALUES(consultation_fee);
 
 INSERT INTO doctor_qualification (id, doctor_id, certificate_type, file_path, status, review_comment, submitted_at, reviewed_at) VALUES
 (1, 1, '执业医师资格证', '/uploads/demo-certificate.jpg', 'APPROVED', '资质完整，允许开展在线诊疗。', NOW(), NOW()),
@@ -55,7 +58,7 @@ INSERT INTO doctor_qualification (id, doctor_id, certificate_type, file_path, st
   reviewed_at = VALUES(reviewed_at);
 
 INSERT INTO doctor_schedule (id, doctor_id, work_date, start_time, end_time, capacity, booked_count) VALUES
-(1, 1, DATE_ADD(CURDATE(), INTERVAL 1 DAY), '09:00:00', '12:00:00', 8, 0),
+(1, 1, DATE_ADD(CURDATE(), INTERVAL 1 DAY), '09:00:00', '12:00:00', 8, 1),
 (2, 1, DATE_ADD(CURDATE(), INTERVAL 2 DAY), '14:00:00', '18:00:00', 8, 0),
 (3, 2, DATE_ADD(CURDATE(), INTERVAL 1 DAY), '14:00:00', '18:00:00', 6, 1),
 (4, 2, DATE_ADD(CURDATE(), INTERVAL 3 DAY), '09:00:00', '12:00:00', 6, 0),
@@ -120,12 +123,13 @@ INSERT INTO ai_config (id, provider_name, base_url, api_key, model, temperature,
 (1, 'OpenAI兼容接口', 'https://api.openai.com/v1', '', 'gpt-4o-mini', 0.2, 900, 1, '请只在本地数据库填写真实api_key，不要提交到远程仓库。', NOW()) ON DUPLICATE KEY UPDATE
   id = id;
 
-INSERT INTO doctor_review (id, patient_id, doctor_id, rating, comment, created_at) VALUES
-(1, 1, 1, 5, '医生解释很耐心，预约流程也方便。', NOW()),
-(2, 2, 2, 5, '洁牙前后都讲得很清楚，体验不错。', NOW()),
-(3, 3, 1, 4, '线上预约很顺畅，候诊时间短。', NOW()) ON DUPLICATE KEY UPDATE
+INSERT INTO doctor_review (id, patient_id, doctor_id, appointment_id, rating, comment, created_at) VALUES
+(1, 1, 1, 3, 5, '医生解释很耐心，预约流程也方便。', NOW()),
+(2, 2, 2, 2, 5, '洁牙前后都讲得很清楚，体验不错。', NOW()),
+(3, 3, 1, 3, 4, '线上预约很顺畅，候诊时间短。', NOW()) ON DUPLICATE KEY UPDATE
   patient_id = VALUES(patient_id),
   doctor_id = VALUES(doctor_id),
+  appointment_id = VALUES(appointment_id),
   rating = VALUES(rating),
   comment = VALUES(comment),
   created_at = VALUES(created_at);
@@ -143,17 +147,20 @@ INSERT INTO medication_reminder (id, patient_id, medicine_id, medicine_name, sta
   expected_run_out_date = VALUES(expected_run_out_date),
   warned = VALUES(warned);
 
-INSERT INTO appointment (id, patient_id, doctor_id, visit_date, time_slot, symptoms, demand, status, status_reason, created_at) VALUES
-(1, 1, 1, DATE_ADD(CURDATE(), INTERVAL 1 DAY), '09:00:00', '右下后牙冷热刺激痛', '希望检查是否龋齿', 'SUBMITTED', NULL, NOW()),
-(2, 2, 2, DATE_ADD(CURDATE(), INTERVAL 1 DAY), '14:30:00', '刷牙时牙龈出血', '想做牙周检查', 'CONFIRMED', '已确认，请准时到诊。', NOW()),
-(3, 3, 1, DATE_SUB(CURDATE(), INTERVAL 5 DAY), '10:00:00', '牙齿敏感', '检查并咨询用药', 'COMPLETED', '已完成接诊。', DATE_SUB(NOW(), INTERVAL 6 DAY)),
-(4, 1, 2, DATE_SUB(CURDATE(), INTERVAL 2 DAY), '15:00:00', '口臭和牙龈肿胀', '希望洁牙评估', 'NO_SHOW', '患者未到诊。', DATE_SUB(NOW(), INTERVAL 3 DAY)) ON DUPLICATE KEY UPDATE
+INSERT INTO appointment (id, patient_id, doctor_id, schedule_id, visit_date, time_slot, symptoms, demand, fee_amount, fee_refunded, status, status_reason, created_at) VALUES
+(1, 1, 1, 1, DATE_ADD(CURDATE(), INTERVAL 1 DAY), '09:00:00', '右下后牙冷热刺激痛', '希望检查是否龋齿', 28.00, 0, 'SUBMITTED', NULL, NOW()),
+(2, 2, 2, 3, DATE_ADD(CURDATE(), INTERVAL 1 DAY), '14:30:00', '刷牙时牙龈出血', '想做牙周检查', 35.00, 0, 'CONFIRMED', '已确认，请准时到诊。', NOW()),
+(3, 3, 1, NULL, DATE_SUB(CURDATE(), INTERVAL 5 DAY), '10:00:00', '牙齿敏感', '检查并咨询用药', 28.00, 0, 'COMPLETED', '已完成接诊。', DATE_SUB(NOW(), INTERVAL 6 DAY)),
+(4, 1, 2, NULL, DATE_SUB(CURDATE(), INTERVAL 2 DAY), '15:00:00', '口臭和牙龈肿胀', '希望洁牙评估', 35.00, 0, 'NO_SHOW', '患者未到诊。', DATE_SUB(NOW(), INTERVAL 3 DAY)) ON DUPLICATE KEY UPDATE
   patient_id = VALUES(patient_id),
   doctor_id = VALUES(doctor_id),
+  schedule_id = VALUES(schedule_id),
   visit_date = VALUES(visit_date),
   time_slot = VALUES(time_slot),
   symptoms = VALUES(symptoms),
   demand = VALUES(demand),
+  fee_amount = VALUES(fee_amount),
+  fee_refunded = VALUES(fee_refunded),
   status = VALUES(status),
   status_reason = VALUES(status_reason),
   created_at = VALUES(created_at);

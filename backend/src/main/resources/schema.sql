@@ -15,19 +15,22 @@ CREATE TABLE IF NOT EXISTS patient_profile (
   gender VARCHAR(20) NULL,
   phone VARCHAR(32) NULL,
   address VARCHAR(255) NULL,
-  allergy_history VARCHAR(500) NULL
+  allergy_history VARCHAR(500) NULL,
+  balance DECIMAL(10,2) NOT NULL DEFAULT 0.00
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='患者基本信息表，存储姓名、性别、联系方式、地址和过敏史';
 
 CREATE TABLE IF NOT EXISTS doctor_profile (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id BIGINT NOT NULL UNIQUE,
   name VARCHAR(64) NOT NULL,
+  gender VARCHAR(20) NULL,
   title VARCHAR(64) NULL,
   department VARCHAR(64) NULL,
   specialty VARCHAR(255) NULL,
   introduction TEXT NULL,
   review_status VARCHAR(20) NOT NULL,
-  rating DOUBLE DEFAULT 5
+  rating DOUBLE DEFAULT 5,
+  consultation_fee DECIMAL(10,2) NOT NULL DEFAULT 20.00
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医生个人资料表，存储职称、科室、擅长方向、简介、审核状态和评分';
 
 CREATE TABLE IF NOT EXISTS doctor_qualification (
@@ -102,10 +105,13 @@ CREATE TABLE IF NOT EXISTS appointment (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   patient_id BIGINT NOT NULL,
   doctor_id BIGINT NOT NULL,
+  schedule_id BIGINT NULL,
   visit_date DATE NOT NULL,
   time_slot TIME NOT NULL,
   symptoms VARCHAR(500) NULL,
   demand VARCHAR(500) NULL,
+  fee_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  fee_refunded TINYINT(1) NOT NULL DEFAULT 0,
   status VARCHAR(30) NOT NULL,
   status_reason VARCHAR(255) NULL,
   created_at DATETIME NOT NULL
@@ -158,6 +164,7 @@ CREATE TABLE IF NOT EXISTS doctor_review (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   patient_id BIGINT NOT NULL,
   doctor_id BIGINT NOT NULL,
+  appointment_id BIGINT NOT NULL,
   rating INT NOT NULL,
   comment VARCHAR(500) NULL,
   created_at DATETIME NOT NULL
@@ -226,3 +233,66 @@ ALTER TABLE symptom_rule CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicod
 ALTER TABLE ai_config CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE medication_reminder CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE operation_log CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'patient_profile' AND COLUMN_NAME = 'balance') = 0,
+  "ALTER TABLE patient_profile ADD COLUMN balance DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '患者账户余额，用于模拟充值、挂号和购药支付'",
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'doctor_profile' AND COLUMN_NAME = 'gender') = 0,
+  "ALTER TABLE doctor_profile ADD COLUMN gender VARCHAR(20) NULL COMMENT '医生性别，用于资料展示和头像区分'",
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'doctor_profile' AND COLUMN_NAME = 'consultation_fee') = 0,
+  "ALTER TABLE doctor_profile ADD COLUMN consultation_fee DECIMAL(10,2) NOT NULL DEFAULT 20.00 COMMENT '医生挂号费用，患者预约时从余额扣减'",
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'appointment' AND COLUMN_NAME = 'schedule_id') = 0,
+  "ALTER TABLE appointment ADD COLUMN schedule_id BIGINT NULL COMMENT '关联排班ID，用于校验可预约时段和同步已约人数'",
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'appointment' AND COLUMN_NAME = 'fee_amount') = 0,
+  "ALTER TABLE appointment ADD COLUMN fee_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '本次预约挂号费用'",
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'appointment' AND COLUMN_NAME = 'fee_refunded') = 0,
+  "ALTER TABLE appointment ADD COLUMN fee_refunded TINYINT(1) NOT NULL DEFAULT 0 COMMENT '挂号费是否已退回患者余额'",
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'doctor_review' AND COLUMN_NAME = 'appointment_id') = 0,
+  "ALTER TABLE doctor_review ADD COLUMN appointment_id BIGINT NOT NULL DEFAULT 0 COMMENT '评分对应的完成预约记录'",
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

@@ -39,6 +39,11 @@ public class PatientController {
         return ApiResponse.ok(profile);
     }
 
+    @PostMapping("/balance/recharge")
+    public ApiResponse<PatientProfile> recharge(@RequestBody RechargeRequest request) {
+        return ApiResponse.ok(clinicService.rechargeBalance(request.amount()));
+    }
+
     @GetMapping("/announcements")
     public ApiResponse<List<Announcement>> announcements() {
         return ApiResponse.ok(clinicService.publishedAnnouncements());
@@ -173,7 +178,7 @@ public class PatientController {
 
     @PostMapping("/reviews")
     public ApiResponse<Void> review(@RequestBody ReviewRequest request) {
-        clinicService.reviewDoctor(request.doctorId(), request.rating(), request.comment());
+        clinicService.reviewDoctor(request.doctorId(), request.appointmentId(), request.rating(), request.comment());
         return ApiResponse.ok();
     }
 
@@ -183,5 +188,6 @@ public class PatientController {
     public record AppointmentRequest(Long doctorId, String visitDate, String timeSlot, String symptoms, String demand) {}
     public record RescheduleRequest(String visitDate, String timeSlot) {}
     public record ConsultRequest(String symptoms) {}
-    public record ReviewRequest(Long doctorId, Integer rating, String comment) {}
+    public record RechargeRequest(java.math.BigDecimal amount) {}
+    public record ReviewRequest(Long doctorId, Long appointmentId, Integer rating, String comment) {}
 }

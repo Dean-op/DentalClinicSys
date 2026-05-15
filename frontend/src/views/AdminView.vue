@@ -200,7 +200,9 @@
               <el-table-column prop="title" label="职称" />
               <el-table-column prop="department" label="科室" />
               <el-table-column prop="specialty" label="擅长方向" min-width="220" />
-              <el-table-column prop="rating" label="评分" width="90" />
+              <el-table-column label="评分" width="90">
+                <template #default="{ row }">{{ formatRating(row.rating) }}</template>
+              </el-table-column>
               <el-table-column label="审核状态" width="110">
                 <template #default="{ row }">
                   <el-tag :type="reviewStatusTag(row.reviewStatus)">{{ reviewStatusLabel(row.reviewStatus) }}</el-tag>
@@ -592,6 +594,11 @@ function orderStatusTag(status: string) {
   if (['REFUND_REQUESTED', 'PENDING_PAY'].includes(status)) return 'warning'
   if (['REFUNDED', 'CANCELLED'].includes(status)) return 'danger'
   return 'info'
+}
+
+function formatRating(value?: number) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
+  return Number(value).toFixed(1)
 }
 
 function announcementStatusLabel(status: string) {

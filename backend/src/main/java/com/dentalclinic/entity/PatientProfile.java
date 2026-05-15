@@ -2,6 +2,7 @@ package com.dentalclinic.entity;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.math.BigDecimal;
 
 @TableName("patient_profile")
 public class PatientProfile {
@@ -13,4 +14,5 @@ public class PatientProfile {
     public String phone;
     public String address;
     public String allergyHistory;
+    public BigDecimal balance;
 }
